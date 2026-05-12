@@ -1,0 +1,52 @@
+# ==============================
+# Node.js / monorepo
+# ==============================
+node_modules/
+**/node_modules/
+dist/
+build/
+.turbo/
+.cache/
+
+# ==============================
+# Python / Virtual Environments
+# ==============================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.venv/
+venv/
+ENV/
+env/
+.env
+.env.*
+!.env.example
+
+# ==============================
+# IDE / Editors
+# ==============================
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-project
+*.sublime-workspace
+
+# ==============================
+# OS Files
+# ==============================
+.DS_Store
+Thumbs.db
+
+# ==============================
+# Project Specific
+# ==============================
+.python-version
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+data/sample_docs/*
+!data/sample_docs/.gitkeep
+data/embeddings_cache/*
+!data/embeddings_cache/.gitkeep

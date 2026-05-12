@@ -1,0 +1,13 @@
+# Vite / React
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Editor
+.vscode/
+
+# Environment
+.env
+.env.*
+!.env.example

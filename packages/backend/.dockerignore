@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+.env
+.git/
+.turbo/
+.ruff_cache/
+data/
+alembic/versions/*.pyc
+!alembic/versions/
