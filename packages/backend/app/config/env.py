@@ -7,7 +7,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from pydantic import Field, field_validator
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -15,6 +15,19 @@ def _default_env_paths() -> tuple[Path, ...]:
     """Resolve `.env` next to backend package root (`packages/backend/.env`)."""
     backend_root = Path(__file__).resolve().parents[2]
     return (backend_root / ".env",)
+
+
+def _comma_or_json_list(raw: str | None, fallback: list[str]) -> list[str]:
+    """Parse comma-separated or JSON-array env strings without pydantic JSON coercion."""
+    if raw is None:
+        return list(fallback)
+    text = str(raw).strip()
+    if not text:
+        return list(fallback)
+    if text.startswith("["):
+        parsed: list[Any] = json.loads(text)
+        return [str(x).strip() for x in parsed if str(x).strip()]
+    return [p.strip() for p in text.split(",") if p.strip()]
 
 
 class AppEnv(BaseSettings):
@@ -25,6 +38,7 @@ class AppEnv(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore",
         case_sensitive=False,
+        env_ignore_empty=True,
     )
 
     app_name: str = "Advisor Flow AI"
@@ -38,31 +52,22 @@ class AppEnv(BaseSettings):
     )
     django_debug: bool = True
 
-    django_allowed_hosts: list[str] = Field(
-        default_factory=lambda: ["localhost", "127.0.0.1", "::1"]
-    )
-
-    cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:3800"])
+    django_allowed_hosts: str | None = Field(default=None)
+    cors_origins: str | None = Field(default=None)
 
     database_url: str | None = Field(
         default=None,
         description="PostgreSQL/SQLAlchemy URL, e.g. postgresql://user:pass@localhost:5432/db",
     )
 
-    @field_validator("django_allowed_hosts", "cors_origins", mode="before")
-    @classmethod
-    def _parse_csv_or_json_str(cls, value: Any) -> Any:
-        if value is None or isinstance(value, list):
-            return value
-        if not isinstance(value, str):
-            return value
-        text = value.strip()
-        if not text:
-            return []
-        if text.startswith("["):
-            parsed: list[Any] = json.loads(text)
-            return [str(x).strip() for x in parsed if str(x).strip()]
-        return [p.strip() for p in text.split(",") if p.strip()]
+    def allowed_hosts_list(self) -> list[str]:
+        return _comma_or_json_list(
+            self.django_allowed_hosts,
+            ["localhost", "127.0.0.1", "::1"],
+        )
+
+    def cors_origins_list(self) -> list[str]:
+        return _comma_or_json_list(self.cors_origins, ["http://localhost:3800"])
 
 
 @lru_cache

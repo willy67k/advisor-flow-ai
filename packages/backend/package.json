@@ -6,6 +6,7 @@
     "dev": "uv run uvicorn app.main:app --reload --port 3801",
     "main": "uv run app/main.py",
     "install": "uv sync",
+    "django:migrate": "uv run python manage.py migrate",
     "lint": "uv run ruff check .",
     "format": "uv run ruff format .",
     "test": "uv run pytest",

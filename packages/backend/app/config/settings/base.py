@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
 from pathlib import Path
 
 from app.config.database_url import django_postgres_settings
@@ -14,7 +15,7 @@ BASE_DIR = Path(__file__).resolve().parents[3]
 
 SECRET_KEY = _env.django_secret_key
 DEBUG = _env.django_debug
-ALLOWED_HOSTS = list(_env.django_allowed_hosts)
+ALLOWED_HOSTS = list(_env.allowed_hosts_list())
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -24,7 +25,10 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "rest_framework",
+    "rest_framework_simplejwt",
+    "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
+    "app.accounts",
 ]
 
 MIDDLEWARE = [
@@ -91,11 +95,16 @@ USE_TZ = True
 STATIC_URL = "static/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+AUTH_USER_MODEL = "accounts.User"
+
 # CORS — explicit origins from env (`CORS_ORIGINS`)
-CORS_ALLOWED_ORIGINS = list(_env.cors_origins)
+CORS_ALLOWED_ORIGINS = list(_env.cors_origins_list())
 CORS_ALLOW_CREDENTIALS = True
 
 REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+    ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.AllowAny",
     ],
@@ -107,4 +116,11 @@ REST_FRAMEWORK = {
         "rest_framework.parsers.FormParser",
         "rest_framework.parsers.MultiPartParser",
     ],
+}
+
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "ROTATE_REFRESH_TOKENS": False,
+    "BLACKLIST_AFTER_ROTATION": True,
 }

@@ -1,9 +1,5 @@
-import React from "react";
-const App: React.FC = () => {
+import { AppRouter } from "./app/AppRouter";
 
-  return (
-    <div></div>
-  );
-};
-
-export default App;
+export default function App() {
+  return <AppRouter />;
+}
