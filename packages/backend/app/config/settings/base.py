@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from app.config.database_url import django_postgres_settings
 from app.config.env import get_env
 
 _env = get_env()
@@ -56,13 +57,16 @@ TEMPLATES = [
     },
 ]
 
-# SQLite until Phase 2.2 (PostgreSQL + Alembic)
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
-    },
-}
+# PostgreSQL via ``DATABASE_URL`` when set; otherwise SQLite file (offline / tests without Docker).
+if _env.database_url:
+    DATABASES = {"default": django_postgres_settings(_env.database_url)}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        },
+    }
 
 AUTH_PASSWORD_VALIDATORS = [
     {

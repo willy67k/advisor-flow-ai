@@ -44,6 +44,11 @@ class AppEnv(BaseSettings):
 
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:3800"])
 
+    database_url: str | None = Field(
+        default=None,
+        description="PostgreSQL/SQLAlchemy URL, e.g. postgresql://user:pass@localhost:5432/db",
+    )
+
     @field_validator("django_allowed_hosts", "cors_origins", mode="before")
     @classmethod
     def _parse_csv_or_json_str(cls, value: Any) -> Any:
