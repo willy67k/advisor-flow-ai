@@ -157,18 +157,18 @@ AI agents can:
 
 # AI / LLM Stack
 
-| Technology           | Purpose                         |
-| -------------------- | ------------------------------- |
-| LangChain            | LLM abstraction layer           |
-| LangGraph            | Stateful workflow orchestration |
-| LangSmith            | AI tracing & observability      |
-| OpenAI API           | LLM provider                    |
-| Gemeni API           | Alternative LLM provider        |
-| Anthropic Claude API | Alternative LLM provider        |
-| pgvector             | Vector similarity search        |
-| Instructor           | Structured output enforcement   |
-| tiktoken             | Token estimation                |
-| RAG Pipeline         | Retrieval workflows             |
+| Technology    | Purpose                         |
+| ------------- | ------------------------------- |
+| LangChain     | LLM abstraction layer           |
+| LangGraph     | Stateful workflow orchestration |
+| LangSmith     | AI tracing & observability      |
+| OpenAI API    | LLM provider                    |
+| Gemini API    | LLM provider                    |
+| Anthropic API | LLM provider                    |
+| pgvector      | Vector similarity search        |
+| Instructor    | Structured output enforcement   |
+| tiktoken      | Token estimation                |
+| RAG Pipeline  | Retrieval workflows             |
 
 ---
 

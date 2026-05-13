@@ -7,7 +7,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -58,6 +58,25 @@ class AppEnv(BaseSettings):
     database_url: str | None = Field(
         default=None,
         description="PostgreSQL/SQLAlchemy URL, e.g. postgresql://user:pass@localhost:5432/db",
+    )
+
+    openai_api_key: str | None = Field(default=None, description="OPENAI_API_KEY")
+    anthropic_api_key: str | None = Field(default=None, description="ANTHROPIC_API_KEY")
+    google_api_key: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("GOOGLE_API_KEY", "GEMINI_API_KEY"),
+        description="GOOGLE_API_KEY or GEMINI_API_KEY (Gemini / Google GenAI)",
+    )
+    ai_openai_default_model: str = Field(
+        default="gpt-4o-mini", description="AI_OPENAI_DEFAULT_MODEL"
+    )
+    ai_anthropic_default_model: str = Field(
+        default="claude-3-5-haiku-20241022",
+        description="AI_ANTHROPIC_DEFAULT_MODEL",
+    )
+    ai_gemini_default_model: str = Field(
+        default="gemini-2.0-flash",
+        description="AI_GEMINI_DEFAULT_MODEL",
     )
 
     def allowed_hosts_list(self) -> list[str]:
