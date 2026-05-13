@@ -55,6 +55,9 @@ local_settings.py
 db.sqlite3
 db.sqlite3-journal
 
+# User uploads (Django MEDIA_ROOT)
+media/
+
 # Flask stuff:
 instance/
 .webassets-cache
