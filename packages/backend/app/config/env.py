@@ -66,6 +66,27 @@ class AppEnv(BaseSettings):
         description="Redis URL for Celery broker, default redis://127.0.0.1:6379/0",
     )
 
+    celery_task_always_eager: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("CELERY_TASK_ALWAYS_EAGER"),
+        description=(
+            "When true (local dev default), Celery executes tasks in the caller process "
+            "(no separate worker)."
+        ),
+    )
+
+    langgraph_checkpoint_sqlite_path: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "LANGGRAPH_CHECKPOINT_SQLITE_PATH",
+            "LANGGRAPH_CHECKPOINT_SQLITE",
+        ),
+        description=(
+            "SQLite file path for LangGraph checkpoints (human-in-the-loop). "
+            "Default: <backend>/langgraph_checkpoints.sqlite3"
+        ),
+    )
+
     openai_api_key: str | None = Field(default=None, description="OPENAI_API_KEY")
     anthropic_api_key: str | None = Field(default=None, description="ANTHROPIC_API_KEY")
     google_api_key: str | None = Field(

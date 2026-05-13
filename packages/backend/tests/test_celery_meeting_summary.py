@@ -45,7 +45,7 @@ def test_run_meeting_summary_task_delay_eager_writes_to_django_results(sample_me
     )
 
     with patch(
-        "app.meetings.tasks.run_meeting_summary_workflow",
+        "app.services.workflows.meeting_summary.run_meeting_summary_workflow",
         return_value=fake,
     ):
         async_result = run_meeting_summary_task.delay(sample_meeting.pk)

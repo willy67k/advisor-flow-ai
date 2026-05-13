@@ -27,8 +27,10 @@ def _celery_state_for_workflow(wf: Workflow) -> str | None:
         return {
             Workflow.Status.COMPLETED: "SUCCESS",
             Workflow.Status.FAILED: "FAILURE",
+            Workflow.Status.REJECTED: "SUCCESS",
             Workflow.Status.PROCESSING: "STARTED",
             Workflow.Status.PENDING: "PENDING",
+            Workflow.Status.WAITING_APPROVAL: "SUCCESS",
         }.get(wf.status, "PENDING")
 
     return AsyncResult(wf.celery_task_id, app=celery_app).state

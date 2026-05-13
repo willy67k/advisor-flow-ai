@@ -3,7 +3,7 @@ import axios from "axios";
 import { useAuthStore } from "../stores/authStore";
 import type { MeResponse, RegisterRequestBody, RegisterResponse, TokenPairResponse } from "../types/auth";
 
-/** Browser calls `/api/**`; Vite dev server proxies to backend (3801). */
+/** Shared JSON client (`/api/...`). */
 export const api = axios.create({
   headers: {
     Accept: "application/json",

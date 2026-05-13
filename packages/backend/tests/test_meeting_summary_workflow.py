@@ -1,13 +1,16 @@
-"""Meeting summary LangGraph workflow (Step 3.2)."""
+"""Meeting summary LangGraph workflow (Step 3.2 + 4.1 interrupt)."""
 
 from unittest.mock import patch
 
 import pytest
+from langgraph.checkpoint.memory import MemorySaver
+from langgraph.types import Command
 
 from app.services.workflows.meeting_summary import (
     MeetingActionItem,
     MeetingSummaryOutput,
     build_meeting_summary_graph,
+    graph_first_interrupt_value,
     run_meeting_summary_workflow,
 )
 
@@ -67,12 +70,18 @@ def test_meeting_summary_graph_invokes_ordered_nodes():
             side_effect=track_extract,
         ),
     ):
-        graph = build_meeting_summary_graph()
-        final = graph.invoke({"notes": SAMPLE_NOTES})
+        mem = MemorySaver()
+        graph = build_meeting_summary_graph(mem)
+        cfg = {"configurable": {"thread_id": "ordered-nodes-test"}}
+        halted = graph.invoke({"notes": SAMPLE_NOTES}, cfg)
+        assert graph_first_interrupt_value(halted) is not None
+        final = graph.invoke(Command(resume={"action": "approve", "note": ""}), cfg)
+        assert graph_first_interrupt_value(final) is None
 
     assert calls["summary"] == calls["extract"] == 1
     assert final["summary"] == "s"
     assert final["action_items"] == [{"task": "Do something", "owner": None, "due": None}]
+    assert final.get("approval_status") == "approved"
 
 
 @pytest.mark.django_db

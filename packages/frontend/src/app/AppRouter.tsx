@@ -5,6 +5,7 @@ import { GuestRoute } from "../components/GuestRoute.tsx";
 import { ProtectedRoute } from "../components/ProtectedRoute.tsx";
 import { LoginPage } from "../features/auth/LoginPage.tsx";
 import { RegisterPage } from "../features/auth/RegisterPage.tsx";
+import { ApprovalsPage } from "../pages/ApprovalsPage.tsx";
 import { DashboardPage } from "../pages/DashboardPage.tsx";
 
 export function AppRouter() {
@@ -20,6 +21,7 @@ export function AppRouter() {
           <Route element={<AppLayout />}>
             <Route element={<Navigate replace to="/dashboard" />} index />
             <Route element={<DashboardPage />} path="dashboard" />
+            <Route element={<ApprovalsPage />} path="approvals" />
           </Route>
         </Route>
 

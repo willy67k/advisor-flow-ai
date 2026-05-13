@@ -1,4 +1,4 @@
-"""Workflow start + detail API — checklist Step 3.4."""
+"""Workflow start + detail API — checklist Step 3.4 + approval pause (Step 4.1)."""
 
 from datetime import date
 from unittest.mock import patch
@@ -6,10 +6,11 @@ from unittest.mock import patch
 import pytest
 
 from app.accounts.models import User
+from app.models.approval import ApprovalRequest
 from app.models.client import Client
 from app.models.meeting import Meeting
 from app.models.workflow import Workflow
-from app.services.workflows.meeting_summary import MeetingActionItem, MeetingSummaryOutput
+from app.services.workflows.meeting_summary import MeetingActionItem
 
 
 @pytest.fixture
@@ -61,15 +62,28 @@ def other_meeting():
 
 
 @pytest.mark.django_db
-def test_workflow_start_returns_id_and_tracks_status(api_client, advisor_ws, meeting_ws):
-    fake = MeetingSummaryOutput(
-        summary="Done",
-        action_items=[MeetingActionItem(task="Follow up", owner="Advisor", due="next week")],
-    )
+def test_workflow_start_pauses_at_approval_then_can_complete_via_api(
+    api_client,
+    advisor_ws,
+    meeting_ws,
+    tmp_path,
+    settings,
+):
+    settings.LANGGRAPH_CHECKPOINT_SQLITE_PATH = tmp_path / "lg.sqlite"
 
-    with patch(
-        "app.meetings.tasks.run_meeting_summary_workflow",
-        return_value=fake,
+    patched_items = [
+        MeetingActionItem(task="Follow up", owner="Advisor", due="next week"),
+    ]
+
+    with (
+        patch(
+            "app.services.workflows.meeting_summary._llm_summarize_notes",
+            return_value="Done",
+        ),
+        patch(
+            "app.services.workflows.meeting_summary._llm_extract_action_items",
+            return_value=patched_items,
+        ),
     ):
         started = api_client.post(
             "/api/workflows/start",
@@ -79,28 +93,51 @@ def test_workflow_start_returns_id_and_tracks_status(api_client, advisor_ws, mee
 
     assert started.status_code == 201
     body = started.json()
-    assert body["workflow_id"] >= 1
     wid = body["workflow_id"]
+
     wf = Workflow.objects.get(pk=wid, meeting=meeting_ws)
-    assert wf.status == Workflow.Status.COMPLETED
-    assert wf.result_json == fake.model_dump()
+    assert wf.status == Workflow.Status.WAITING_APPROVAL
+    assert wf.result_json is None
     assert wf.celery_task_id
+
+    ar = ApprovalRequest.objects.filter(workflow=wf, status=ApprovalRequest.Status.PENDING).get()
+    assert ar.ai_draft_json["summary"] == "Done"
 
     detail = api_client.get(f"/api/workflows/{wid}")
     assert detail.status_code == 200
     got = detail.json()
     assert got["id"] == wid
-    assert got["status"] == Workflow.Status.COMPLETED
-    assert got["meeting_id"] == meeting_ws.pk
-    assert got["result_json"] == fake.model_dump()
+    assert got["status"] == Workflow.Status.WAITING_APPROVAL
     assert got["celery_state"] == "SUCCESS"
+    assert got["pending_approval_id"] == ar.pk
+
+    approved = api_client.post(f"/api/approvals/{ar.pk}/approve", {"note": "lgtm"}, format="json")
+    assert approved.status_code == 200
+    wf.refresh_from_db()
+    ar.refresh_from_db()
+
+    assert ar.status == ApprovalRequest.Status.APPROVED
+    assert ar.reviewer_id == advisor_ws.pk
+    assert wf.status == Workflow.Status.COMPLETED
+    assert wf.result_json is not None
+    assert wf.result_json["summary"] == "Done"
+    assert wf.result_json["approval_status"] == "approved"
+
+    detail2 = api_client.get(f"/api/workflows/{wid}")
+    assert detail2.json()["pending_approval_id"] is None
 
 
 @pytest.mark.django_db
 def test_workflow_start_404_for_other_advisor_meeting(api_client, advisor_ws, other_meeting):
-    with patch(
-        "app.meetings.tasks.run_meeting_summary_workflow",
-        return_value=MeetingSummaryOutput(summary="x"),
+    with (
+        patch(
+            "app.services.workflows.meeting_summary._llm_summarize_notes",
+            return_value="x",
+        ),
+        patch(
+            "app.services.workflows.meeting_summary._llm_extract_action_items",
+            return_value=[MeetingActionItem(task="t")],
+        ),
     ):
         resp = api_client.post(
             "/api/workflows/start",

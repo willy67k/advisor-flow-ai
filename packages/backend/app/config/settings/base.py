@@ -35,6 +35,7 @@ INSTALLED_APPS = [
     "app.meetings",
     "app.documents",
     "app.workflows",
+    "app.approvals.apps.ApprovalsConfig",
 ]
 
 MIDDLEWARE = [
@@ -148,3 +149,10 @@ CELERY_BROKER_URL = _env.celery_broker_url or "redis://127.0.0.1:6379/0"
 CELERY_RESULT_BACKEND = "django-db"
 CELERY_RESULT_EXTENDED = True
 CELERY_TASK_TRACK_STARTED = True
+
+# LangGraph durable checkpoints (interrupt / resume) — shared path for web + Celery worker on one host/volume
+LANGGRAPH_CHECKPOINT_SQLITE_PATH = (
+    Path(_env.langgraph_checkpoint_sqlite_path)
+    if _env.langgraph_checkpoint_sqlite_path
+    else BASE_DIR / "langgraph_checkpoints.sqlite3"
+)

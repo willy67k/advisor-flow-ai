@@ -45,6 +45,7 @@ dependencies = [
     "tenacity>=8.5",
     "orjson>=3.10",
     "drf-spectacular>=0.29.0",
+    "langgraph-checkpoint-sqlite>=3.1.0",
 ]
 
 [project.optional-dependencies]

@@ -11,8 +11,10 @@ class Workflow(models.Model):
     class Status(models.TextChoices):
         PENDING = "pending", "Pending"
         PROCESSING = "processing", "Processing"
+        WAITING_APPROVAL = "waiting_approval", "Waiting approval"
         COMPLETED = "completed", "Completed"
         FAILED = "failed", "Failed"
+        REJECTED = "rejected", "Rejected"
 
     status = models.CharField(
         max_length=32,

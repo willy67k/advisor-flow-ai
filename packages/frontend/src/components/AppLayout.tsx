@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 
 import { roleLabel } from "../lib/roleLabel";
 import { logoutRequest } from "../services/api";
@@ -9,11 +9,14 @@ const navClass = ({ isActive }: { readonly isActive: boolean }) =>
 
 export function AppLayout() {
   const user = useAuthStore((s) => s.user);
+  const location = useLocation();
 
   async function handleLogout() {
     await logoutRequest().catch(() => undefined);
     window.location.assign("/login");
   }
+
+  const headerTitle = location.pathname.startsWith("/approvals") ? "Approvals" : "Overview";
 
   return (
     <div className="flex min-h-screen bg-slate-950 text-slate-100">
@@ -26,12 +29,15 @@ export function AppLayout() {
           <NavLink className={(p) => navClass(p)} end to="/dashboard">
             Overview
           </NavLink>
+          <NavLink className={(p) => navClass(p)} end to="/approvals">
+            Approvals
+          </NavLink>
         </nav>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 items-center justify-between border-b border-slate-800 px-6">
-          <span className="text-sm font-medium text-slate-300">Overview</span>
+          <span className="text-sm font-medium text-slate-300">{headerTitle}</span>
           <div className="flex items-center gap-4">
             {user ? (
               <span className="hidden text-xs text-slate-500 md:inline">

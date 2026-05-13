@@ -23,7 +23,7 @@ export function DashboardPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-xl font-semibold tracking-tight text-white">Overview</h1>
-        <p className="mt-2 max-w-xl text-sm leading-relaxed text-slate-400">You’re signed in. Your profile and permissions are shown below. When more tools are available, they’ll appear in the sidebar.</p>
+        <p className="mt-2 max-w-xl text-sm leading-relaxed text-slate-400">Welcome back. Below is your account information.</p>
       </div>
 
       <div className="max-w-xl rounded-xl border border-slate-800 bg-slate-900/60 p-6">
