@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     "app.clients",
     "app.meetings",
     "app.documents",
+    "app.workflows",
 ]
 
 MIDDLEWARE = [

@@ -4,9 +4,13 @@ import os
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "app.config.settings.dev")
 
-from celery import Celery  # noqa: E402
+import django  # noqa: E402
+
+django.setup()
+
+from celery import Celery  # noqa: E402 - after Django configures settings/apps
 
 celery_app = Celery("advisorflow")
 celery_app.config_from_object("django.conf:settings", namespace="CELERY")
 
-import app.meetings.tasks  # noqa: E402, F401 — register task modules
+import app.meetings.tasks  # noqa: E402, F401 - register tasks after Django loads
