@@ -60,6 +60,12 @@ class AppEnv(BaseSettings):
         description="PostgreSQL/SQLAlchemy URL, e.g. postgresql://user:pass@localhost:5432/db",
     )
 
+    celery_broker_url: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("CELERY_BROKER_URL"),
+        description="Redis URL for Celery broker, default redis://127.0.0.1:6379/0",
+    )
+
     openai_api_key: str | None = Field(default=None, description="OPENAI_API_KEY")
     anthropic_api_key: str | None = Field(default=None, description="ANTHROPIC_API_KEY")
     google_api_key: str | None = Field(

@@ -16,3 +16,7 @@ PASSWORD_HASHERS = [
 EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
 
 SECRET_KEY = "test-secret-key-not-for-production"
+
+# Celery: run tasks inline in CI/pytest — no Redis required.
+CELERY_TASK_ALWAYS_EAGER = True
+CELERY_TASK_EAGER_PROPAGATES = True

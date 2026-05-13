@@ -29,6 +29,7 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
     "drf_spectacular",
+    "django_celery_results",
     "app.accounts",
     "app.clients",
     "app.meetings",
@@ -140,3 +141,9 @@ SIMPLE_JWT = {
     "ROTATE_REFRESH_TOKENS": False,
     "BLACKLIST_AFTER_ROTATION": True,
 }
+
+# Celery (Step 3.3): Redis broker + django-celery-results persistence
+CELERY_BROKER_URL = _env.celery_broker_url or "redis://127.0.0.1:6379/0"
+CELERY_RESULT_BACKEND = "django-db"
+CELERY_RESULT_EXTENDED = True
+CELERY_TASK_TRACK_STARTED = True
