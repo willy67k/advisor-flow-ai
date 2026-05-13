@@ -12,6 +12,7 @@ from openai import OpenAI
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.config.env import get_env
+from app.prompts import PromptKey, prompt_template
 from app.services.ai.gateway import ChatMessage, LLMProvider, complete_chat
 
 logger = logging.getLogger(__name__)
@@ -52,7 +53,10 @@ class MeetingWorkflowState(TypedDict, total=False):
 
 def _llm_summarize_notes(notes: str) -> str:
     msgs = [
-        ChatMessage(role="system", content=_SUMMARY_SYSTEM),
+        ChatMessage(
+            role="system",
+            content=prompt_template(PromptKey.MEETING_SUMMARY_SUMMARIZE_SYSTEM),
+        ),
         ChatMessage(
             role="user",
             content=f"Meeting notes:\n\n{notes}\n\nWrite the summary only.",
@@ -89,24 +93,16 @@ def _llm_extract_action_items(*, notes: str, summary: str) -> list[MeetingAction
             model=env.ai_openai_default_model,
             response_model=_ActionItemsStructured,
             messages=[
-                {"role": "system", "content": _ACTION_ITEMS_SYSTEM},
+                {
+                    "role": "system",
+                    "content": prompt_template(PromptKey.MEETING_SUMMARY_ACTION_ITEMS_SYSTEM),
+                },
                 {"role": "user", "content": payload},
             ],
             temperature=0.1,
         ),
     )
     return list(extraction.action_items)
-
-
-_SUMMARY_SYSTEM = (
-    "You summarize financial-advisor meeting notes for internal records. "
-    "Use concise bullet prose; preserve names, figures, deadlines, risks, decisions."
-)
-
-_ACTION_ITEMS_SYSTEM = (
-    "You extract clear action items from meeting materials. Each item must describe "
-    "a single follow-up task. Normalize wording; duplicate tasks may be omitted."
-)
 
 
 def _node_generate_summary(state: MeetingWorkflowState) -> MeetingWorkflowState:
