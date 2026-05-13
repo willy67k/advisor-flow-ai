@@ -31,6 +31,7 @@ INSTALLED_APPS = [
     "drf_spectacular",
     "app.accounts",
     "app.clients",
+    "app.meetings",
 ]
 
 MIDDLEWARE = [

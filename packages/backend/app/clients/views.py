@@ -1,9 +1,13 @@
 from rest_framework import viewsets
+from rest_framework.decorators import action
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 
 from app.clients.serializers import ClientSerializer
+from app.meetings.serializers import MeetingSerializer
 from app.models.client import Client
+from app.models.meeting import Meeting
 
 
 class ClientPagination(PageNumberPagination):
@@ -25,3 +29,15 @@ class ClientViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(advisor=self.request.user)
+
+    @action(detail=True, methods=["get"], url_path="meetings")
+    def meetings(self, request, pk=None):
+        """Meetings for this client (same advisor)."""
+        client = self.get_object()
+        qs = Meeting.objects.filter(client=client, advisor=request.user).select_related("client")
+        page = self.paginate_queryset(qs)
+        if page is not None:
+            serializer = MeetingSerializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = MeetingSerializer(qs, many=True)
+        return Response(serializer.data)
