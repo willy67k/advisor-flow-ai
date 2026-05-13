@@ -44,6 +44,7 @@ dependencies = [
     "structlog>=24.4",
     "tenacity>=8.5",
     "orjson>=3.10",
+    "drf-spectacular>=0.29.0",
 ]
 
 [project.optional-dependencies]
