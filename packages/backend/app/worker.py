@@ -13,4 +13,5 @@ from celery import Celery  # noqa: E402 - after Django configures settings/apps
 celery_app = Celery("advisorflow")
 celery_app.config_from_object("django.conf:settings", namespace="CELERY")
 
+import app.documents.tasks  # noqa: E402 - register tasks after Django loads
 import app.meetings.tasks  # noqa: E402, F401 - register tasks after Django loads

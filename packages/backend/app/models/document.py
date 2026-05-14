@@ -27,6 +27,7 @@ class Document(models.Model):
         related_name="documents",
         db_index=True,
     )
+    extracted_text = models.TextField(blank=True, default="")
 
     class Meta:
         app_label = "documents"

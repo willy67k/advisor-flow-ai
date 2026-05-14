@@ -57,15 +57,16 @@ def test_upload_pdf_creates_document_record(api_client, advisor_auth, meeting):
     )
     assert resp.status_code == 201
     body = resp.json()
-    assert body["status"] == Document.Status.UPLOADED
+    assert body["status"] == Document.Status.READY
     assert body["meeting"] == meeting.pk
     assert "id" in body
+    assert "extracted_text" in body
     assert Document.objects.filter(pk=body["id"]).exists()
 
     detail = api_client.get(f"/api/documents/{body['id']}/")
     assert detail.status_code == 200
     assert detail.json()["file_name"] == "notes.pdf"
-    assert detail.json()["status"] == Document.Status.UPLOADED
+    assert detail.json()["status"] == Document.Status.READY
 
 
 @pytest.mark.django_db

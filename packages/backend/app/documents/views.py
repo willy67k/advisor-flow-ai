@@ -14,6 +14,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from app.documents.serializers import DocumentSerializer
+from app.documents.tasks import process_document_task
 from app.models.document import Document
 from app.models.meeting import Meeting
 
@@ -78,6 +79,8 @@ class DocumentUploadView(APIView):
             status=Document.Status.UPLOADED,
             meeting=meeting,
         )
+        process_document_task.delay(int(doc.pk))
+        doc.refresh_from_db()
         return Response(DocumentSerializer(doc).data, status=status.HTTP_201_CREATED)
 
 
