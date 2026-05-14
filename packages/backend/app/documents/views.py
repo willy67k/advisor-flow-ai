@@ -8,6 +8,7 @@ from pathlib import Path
 from django.core.files.storage import default_storage
 from django.utils.text import get_valid_filename
 from rest_framework import generics, status
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -20,6 +21,31 @@ from app.models.meeting import Meeting
 
 ALLOWED_EXTENSIONS = frozenset({".pdf", ".doc", ".docx"})
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+
+
+class DocumentPagination(PageNumberPagination):
+    page_size = 20
+    page_size_query_param = "page_size"
+    max_page_size = 100
+
+
+class DocumentListView(generics.ListAPIView):
+    """List documents for meetings owned by the caller; optional ``?meeting=<id>`` filter."""
+
+    permission_classes = (IsAuthenticated,)
+    serializer_class = DocumentSerializer
+    pagination_class = DocumentPagination
+
+    def get_queryset(self):
+        qs = Document.objects.filter(meeting__advisor=self.request.user).select_related("meeting")
+        meeting_raw = self.request.query_params.get("meeting")
+        if meeting_raw is None:
+            return qs
+        try:
+            meeting_id = int(meeting_raw)
+        except (TypeError, ValueError):
+            return Document.objects.none()
+        return qs.filter(meeting_id=meeting_id)
 
 
 class DocumentUploadView(APIView):

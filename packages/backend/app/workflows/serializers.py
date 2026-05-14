@@ -33,6 +33,29 @@ class WorkflowSerializer(serializers.ModelSerializer):
         return int(ar.pk) if ar is not None else None
 
 
+class WorkflowListItemSerializer(serializers.ModelSerializer):
+    """Light payload for dashboards (no ``result_json``)."""
+
+    meeting_id = serializers.IntegerField(read_only=True)
+    meeting_title = serializers.CharField(source="meeting.title", read_only=True)
+    pending_approval_id = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Workflow
+        fields = ("id", "status", "meeting_id", "meeting_title", "pending_approval_id")
+
+    def get_pending_approval_id(self, obj: Workflow) -> int | None:
+        ar = (
+            ApprovalRequest.objects.filter(
+                workflow=obj,
+                status=ApprovalRequest.Status.PENDING,
+            )
+            .order_by("-id")
+            .first()
+        )
+        return int(ar.pk) if ar is not None else None
+
+
 class WorkflowStartSerializer(serializers.Serializer):
     meeting_id = serializers.IntegerField(min_value=1)
 

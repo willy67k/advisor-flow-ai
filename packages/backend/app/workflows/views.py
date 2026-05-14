@@ -5,6 +5,8 @@ from django.conf import settings
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiExample, extend_schema
 from rest_framework import status
+from rest_framework.generics import ListAPIView
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -14,10 +16,26 @@ from app.models.meeting import Meeting
 from app.models.workflow import Workflow
 from app.worker import celery_app
 from app.workflows.serializers import (
+    WorkflowListItemSerializer,
     WorkflowSerializer,
     WorkflowStartedResponseSerializer,
     WorkflowStartSerializer,
 )
+
+
+class WorkflowPagination(PageNumberPagination):
+    page_size = 25
+    page_size_query_param = "page_size"
+    max_page_size = 50
+
+
+class WorkflowListView(ListAPIView):
+    permission_classes = (IsAuthenticated,)
+    serializer_class = WorkflowListItemSerializer
+    pagination_class = WorkflowPagination
+
+    def get_queryset(self):
+        return Workflow.objects.filter(meeting__advisor=self.request.user).select_related("meeting")
 
 
 def _celery_state_for_workflow(wf: Workflow) -> str | None:

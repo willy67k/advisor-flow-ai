@@ -18,10 +18,13 @@ repos:
       - id: ruff-format
         files: ^packages/backend/
 
-  # Frontend & Other files Formatting (Prettier)
-  - repo: https://github.com/pre-commit/mirrors-prettier
-    rev: v3.1.0
+  # Frontend — use the same Prettier + plugins as `yarn format` (packages/frontend).
+  # mirrors-prettier is archived and pins an old Prettier without workspace plugins.
+  - repo: local
     hooks:
-      - id: prettier
-        types_or: [javascript, jsx, ts, tsx, json, css, scss, markdown]
+      - id: frontend-prettier
+        name: Prettier (packages/frontend, same as yarn format)
+        language: system
+        entry: node ./node_modules/prettier/bin/prettier.cjs --write
+        types_or: [html, javascript, jsx, ts, tsx, json, css, scss, markdown]
         files: ^packages/frontend/

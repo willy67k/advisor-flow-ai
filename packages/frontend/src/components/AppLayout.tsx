@@ -7,16 +7,48 @@ import { useAuthStore } from "../stores/authStore";
 const navClass = ({ isActive }: { readonly isActive: boolean }) =>
   ["block cursor-pointer rounded-md px-3 py-2 text-sm font-medium transition-colors", isActive ? "bg-slate-700 text-white" : "text-slate-300 hover:bg-slate-800 hover:text-white"].join(" ");
 
+const NAV_ITEMS = [
+  { to: "/dashboard", label: "Overview" },
+  { to: "/clients", label: "Clients" },
+  { to: "/meetings", label: "Meetings" },
+  { to: "/documents", label: "Documents" },
+  { to: "/meeting-summary", label: "Meeting summary" },
+  { to: "/chat", label: "AI Chat" },
+] as const;
+
+const ROUTE_TITLE: Record = {
+  dashboard: "Overview",
+  clients: "Clients",
+  meetings: "Meetings",
+  documents: "Documents",
+  "meeting-summary": "Meeting summary",
+  chat: "AI Chat",
+};
+
+function layoutTitle(pathname: string): string {
+  const segments = pathname.split("/").filter(Boolean);
+  const first = segments[0] ?? "";
+  const second = segments[1] ?? "";
+
+  if (first === "meetings" && second !== "" && /^\d+$/.test(second)) {
+    return "Meeting detail";
+  }
+  if (first && ROUTE_TITLE[first]) {
+    return ROUTE_TITLE[first];
+  }
+  return "AdvisorFlow";
+}
+
 export function AppLayout() {
   const user = useAuthStore((s) => s.user);
   const location = useLocation();
+
+  const headerTitle = layoutTitle(location.pathname);
 
   async function handleLogout() {
     await logoutRequest().catch(() => undefined);
     window.location.assign("/login");
   }
-
-  const headerTitle = location.pathname.startsWith("/approvals") ? "Approvals" : "Overview";
 
   return (
     <div className="flex min-h-screen bg-slate-950 text-slate-100">
@@ -26,12 +58,11 @@ export function AppLayout() {
           <p className="font-semibold text-slate-100">Workspace</p>
         </div>
         <nav className="flex flex-1 flex-col gap-1 p-3">
-          <NavLink className={(p) => navClass(p)} end to="/dashboard">
-            Overview
-          </NavLink>
-          <NavLink className={(p) => navClass(p)} end to="/approvals">
-            Approvals
-          </NavLink>
+          {NAV_ITEMS.map(({ to, label }) => (
+            <NavLink key={to} className={(p) => navClass(p)} end={to !== "/meetings"} to={to}>
+              {label}
+            </NavLink>
+          ))}
         </nav>
       </aside>
 

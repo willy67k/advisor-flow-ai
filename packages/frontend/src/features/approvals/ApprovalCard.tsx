@@ -14,7 +14,11 @@ export function ApprovalCard({ approval }: Props) {
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const invalidate = async () => {
-    await queryClient.invalidateQueries({ queryKey: ["approvals", "pending"] });
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["approvals", "pending"] }),
+      queryClient.invalidateQueries({ queryKey: ["meetingAiSummary", approval.meeting_id] }),
+      queryClient.invalidateQueries({ queryKey: ["workflows", "list"] }),
+    ]);
   };
 
   const approveMut = useMutation({
