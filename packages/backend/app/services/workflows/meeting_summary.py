@@ -19,6 +19,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.config.env import get_env
 from app.prompts import PromptKey, prompt_template
 from app.services.ai.gateway import ChatMessage, LLMProvider, complete_chat
+from app.services.ai.retrieval import retrieve_context_for_meeting_notes
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +59,8 @@ class MeetingWorkflowState(TypedDict, total=False):
     """LangGraph shared state."""
 
     notes: str
+    meeting_id: int
+    rag_context: str
     summary: str
     action_items: list[dict[str, Any]]
     approval_status: str
@@ -79,12 +82,14 @@ def graph_first_interrupt_value(result: Mapping[str, Any]) -> Any | None:
 
 
 def build_meeting_summary_graph(checkpointer: Any) -> CompiledStateGraph:
-    """Compiled graph with ``wait_for_approval`` interrupt (requires a checkpointer)."""
+    """Compiled graph with RAG retrieval, then summary, approvals interrupt, checkpointer."""
     workflow = StateGraph(MeetingWorkflowState)
+    workflow.add_node("retrieve_context", _node_retrieve_context)
     workflow.add_node("generate_summary", _node_generate_summary)
     workflow.add_node("extract_action_items", _node_extract_action_items)
     workflow.add_node("wait_for_approval", _node_wait_for_approval)
-    workflow.add_edge(START, "generate_summary")
+    workflow.add_edge(START, "retrieve_context")
+    workflow.add_edge("retrieve_context", "generate_summary")
     workflow.add_edge("generate_summary", "extract_action_items")
     workflow.add_edge("extract_action_items", "wait_for_approval")
     workflow.add_edge("wait_for_approval", END)
@@ -96,16 +101,23 @@ def invoke_meeting_summary_graph(
     notes: str,
     workflow_id: int,
     checkpoint_path: Path | str,
+    meeting_id: int | None = None,
 ) -> MeetingWorkflowState:
-    """Run summary + action items + interrupt; returns state (may include ``__interrupt__``)."""
+    """Run retrieval + summary + action items + interrupt (may include ``__interrupt__``)."""
     path = Path(checkpoint_path)
     path.parent.mkdir(parents=True, exist_ok=True)
 
     cfg = meeting_summary_thread_config(workflow_id)
     with SqliteSaver.from_conn_string(str(path)) as saver:
         compiled = build_meeting_summary_graph(saver)
-        initial: MeetingWorkflowState = {"notes": notes}
-        out = compiled.invoke(cast(MeetingWorkflowState, initial), cfg)
+        initial = cast(
+            MeetingWorkflowState,
+            {
+                "notes": notes,
+                **({"meeting_id": int(meeting_id)} if meeting_id is not None else {}),
+            },
+        )
+        out = compiled.invoke(initial, cfg)
     return cast(MeetingWorkflowState, out)
 
 
@@ -137,12 +149,17 @@ def run_meeting_summary_workflow(
     graph: CompiledStateGraph | None = None,
     thread_id: str = "dev-meeting-summary",
     approval_resume: dict[str, Any] | None = None,
+    meeting_id: int | None = None,
 ) -> MeetingSummaryOutput:
     """Invoke meeting-summary graph including human approval (defaults to auto-approve)."""
     mem = MemorySaver()
     compiled = graph or build_meeting_summary_graph(mem)
     cfg = {"configurable": {"thread_id": thread_id}}
-    out = compiled.invoke(cast(MeetingWorkflowState, {"notes": notes}), cfg)
+    initial = cast(
+        MeetingWorkflowState,
+        {"notes": notes, **({"meeting_id": int(meeting_id)} if meeting_id is not None else {})},
+    )
+    out = compiled.invoke(initial, cfg)
     if graph_first_interrupt_value(out) is not None:
         payload = approval_resume or {
             "action": _APPROVAL_ACTION_APPROVE,
@@ -156,7 +173,21 @@ def run_meeting_summary_workflow(
     return meeting_state_to_summary_output(cast(MeetingWorkflowState, out))
 
 
-def _llm_summarize_notes(notes: str) -> str:
+def _llm_summarize_notes(*, notes: str, rag_context: str = "") -> str:
+    rc = rag_context.strip()
+    if rc:
+        user_blob = (
+            "Use DOCUMENT EXCERPTS as factual context when relevant. "
+            "If they contradict shorthand NOTES, prefer the excerpts for facts "
+            "(names, numbers, timelines). Ignore irrelevant excerpts.\n\n"
+            "DOCUMENT EXCERPTS:\n"
+            f"{rc}\n\n"
+            "---\nMEETING NOTES:\n"
+            f"{notes}\n\n"
+            "Write the summary only."
+        )
+    else:
+        user_blob = f"Meeting notes:\n\n{notes}\n\nWrite the summary only."
     msgs = [
         ChatMessage(
             role="system",
@@ -164,7 +195,7 @@ def _llm_summarize_notes(notes: str) -> str:
         ),
         ChatMessage(
             role="user",
-            content=f"Meeting notes:\n\n{notes}\n\nWrite the summary only.",
+            content=user_blob,
         ),
     ]
     result = complete_chat(
@@ -210,20 +241,35 @@ def _llm_extract_action_items(*, notes: str, summary: str) -> list[MeetingAction
     return list(extraction.action_items)
 
 
+def _node_retrieve_context(state: MeetingWorkflowState) -> MeetingWorkflowState:
+    mid = state.get("meeting_id")
+    notes = str(state.get("notes") or "")
+    if mid is None or not notes.strip():
+        return {"rag_context": ""}
+    rag = retrieve_context_for_meeting_notes(meeting_id=int(mid), query_text=notes)
+    return {"rag_context": rag}
+
+
 def _node_generate_summary(state: MeetingWorkflowState) -> MeetingWorkflowState:
     notes = state.get("notes", "").strip()
     if not notes:
         logger.warning("meeting_summary: empty notes; skipping LLM summarize.")
         return {"summary": ""}
-    summary = _llm_summarize_notes(notes)
+    rag = str(state.get("rag_context") or "")
+    summary = _llm_summarize_notes(notes=notes, rag_context=rag)
     return {"summary": summary}
 
 
 def _node_extract_action_items(state: MeetingWorkflowState) -> MeetingWorkflowState:
-    notes = state.get("notes", "")
+    notes_raw = state.get("notes", "")
     summary = state.get("summary", "")
     if not summary.strip():
         return {"action_items": []}
+
+    rag = str(state.get("rag_context") or "").strip()
+    notes = (
+        notes_raw + "\n\n[Retrieved excerpts from uploaded documents]\n" + rag if rag else notes_raw
+    )
 
     raw_items = _llm_extract_action_items(notes=notes, summary=summary)
     return {"action_items": [item.model_dump() for item in raw_items]}

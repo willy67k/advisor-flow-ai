@@ -49,9 +49,10 @@ def test_run_meeting_summary_workflow_returns_structured_output():
 def test_meeting_summary_graph_invokes_ordered_nodes():
     calls: dict[str, int] = {"summary": 0, "extract": 0}
 
-    def track_summary(notes: str) -> str:
+    def track_summary(*, notes: str, rag_context: str = "") -> str:
         calls["summary"] += 1
         assert "Q2 portfolio" in notes
+        assert isinstance(rag_context, str)
         return "s"
 
     def track_extract(*, notes: str, summary: str) -> list[MeetingActionItem]:

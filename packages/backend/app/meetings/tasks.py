@@ -47,6 +47,7 @@ def run_meeting_summary_task(
 
         state = invoke_meeting_summary_graph(
             notes=notes,
+            meeting_id=int(meeting_id),
             workflow_id=int(wf_row.pk),
             checkpoint_path=checkpoint_path,
         )
