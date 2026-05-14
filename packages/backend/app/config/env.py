@@ -105,6 +105,11 @@ class AppEnv(BaseSettings):
         default="gemini-2.0-flash",
         description="AI_GEMINI_DEFAULT_MODEL",
     )
+    openai_embedding_model: str = Field(
+        default="text-embedding-3-small",
+        validation_alias=AliasChoices("OPENAI_EMBEDDING_MODEL"),
+        description="OpenAI embeddings model (Step 5.2 RAG chunks)",
+    )
 
     def allowed_hosts_list(self) -> list[str]:
         return _comma_or_json_list(

@@ -9,4 +9,6 @@ def test_settings_configured(settings):
     assert settings.SECRET_KEY
     assert "django.contrib.admin" in settings.INSTALLED_APPS
     assert "corsheaders" in settings.INSTALLED_APPS
-    assert "memory" in str(settings.DATABASES["default"]["NAME"]).lower()
+    db = settings.DATABASES["default"]
+    assert db["ENGINE"] == "django.db.backends.postgresql"
+    assert db["HOST"]
