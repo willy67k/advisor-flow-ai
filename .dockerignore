@@ -1,0 +1,15 @@
+# Used when Compose build context is repo root (`frontend` service).
+**/node_modules
+.git
+.turbo
+**/.vite
+dist
+packages/backend/.venv
+packages/backend/**/__pycache__
+packages/backend/.pytest_cache
+packages/backend/media
+packages/backend/.env
+packages/backend/*.sqlite3
+packages/backend/langgraph_checkpoints.sqlite3
+.report
+.cursor

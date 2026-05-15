@@ -22,6 +22,122 @@ services:
     ports:
       - "${REDIS_PORT:-6379}:6379"
     command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: infra/docker/backend/Dockerfile
+    command: >-
+      sh -c "uv run python manage.py migrate --noinput &&
+      uv run uvicorn app.main:app --host 0.0.0.0 --port 3801"
+    ports:
+      - "${BACKEND_PORT:-3801}:3801"
+    volumes:
+      - advisorflow_media:/app/media
+      - advisorflow_langgraph:/app/langgraph_data
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-advisorflow}:${POSTGRES_PASSWORD:-advisorflow}@db:5432/${POSTGRES_DB:-advisorflow}
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_TASK_ALWAYS_EAGER: "false"
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-true}
+      DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1,::1,backend
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-dev-docker-compose-change-me}
+      # Browser origin for the Vite dev server (host-mapped port).
+      CORS_ORIGINS: '["http://localhost:${FRONTEND_PORT:-3800}"]'
+      LANGGRAPH_CHECKPOINT_SQLITE_PATH: /app/langgraph_data/langgraph_checkpoints.sqlite3
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      LANGSMITH_API_KEY: ${LANGSMITH_API_KEY:-}
+      LANGCHAIN_TRACING_V2: ${LANGCHAIN_TRACING_V2:-true}
+      LANGCHAIN_PROJECT: ${LANGCHAIN_PROJECT:-advisor-flow-ai}
+      # Optional — EU LangSmith: https://eu.api.smith.langchain.com ; omit / leave empty for US default.
+      LANGCHAIN_ENDPOINT: ${LANGCHAIN_ENDPOINT:-}
+      OBSERVABILITY_LOG_TO_DB: ${OBSERVABILITY_LOG_TO_DB:-true}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3801/health/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  worker:
+    build:
+      context: .
+      dockerfile: infra/docker/backend/Dockerfile
+    command: ["uv", "run", "celery", "-A", "app.worker:celery_app", "worker", "-l", "INFO"]
+    volumes:
+      - advisorflow_media:/app/media
+      - advisorflow_langgraph:/app/langgraph_data
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-advisorflow}:${POSTGRES_PASSWORD:-advisorflow}@db:5432/${POSTGRES_DB:-advisorflow}
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_TASK_ALWAYS_EAGER: "false"
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-true}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-dev-docker-compose-change-me}
+      LANGGRAPH_CHECKPOINT_SQLITE_PATH: /app/langgraph_data/langgraph_checkpoints.sqlite3
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      LANGSMITH_API_KEY: ${LANGSMITH_API_KEY:-}
+      LANGCHAIN_TRACING_V2: ${LANGCHAIN_TRACING_V2:-true}
+      LANGCHAIN_PROJECT: ${LANGCHAIN_PROJECT:-advisor-flow-ai}
+      # Optional — EU LangSmith: https://eu.api.smith.langchain.com ; omit / leave empty for US default.
+      LANGCHAIN_ENDPOINT: ${LANGCHAIN_ENDPOINT:-}
+      OBSERVABILITY_LOG_TO_DB: ${OBSERVABILITY_LOG_TO_DB:-true}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+
+  flower:
+    profiles: [flower]
+    build:
+      context: .
+      dockerfile: infra/docker/backend/Dockerfile
+    command: ["uv", "run", "celery", "-A", "app.worker:celery_app", "flower", "--port=5555"]
+    ports:
+      - "${FLOWER_PORT:-5555}:5555"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-advisorflow}:${POSTGRES_PASSWORD:-advisorflow}@db:5432/${POSTGRES_DB:-advisorflow}
+      CELERY_BROKER_URL: redis://redis:6379/0
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-dev-docker-compose-change-me}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: .
+      dockerfile: infra/docker/frontend/Dockerfile
+    ports:
+      - "${FRONTEND_PORT:-3800}:3800"
+    environment:
+      VITE_DEV_PROXY_TARGET: ${VITE_DEV_PROXY_TARGET:-http://backend:3801}
+    depends_on:
+      backend:
+        condition: service_healthy
 
 volumes:
   advisorflow_pgdata:
+  advisorflow_media:
+  advisorflow_langgraph:
