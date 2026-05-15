@@ -17,7 +17,10 @@ const NAV_ITEMS = [
 ] as const;
 
 const COMPLIANCE_NAV = { to: "/compliance", label: "Compliance" } as const;
-const AUDIT_NAV = { to: "/audit-logs", label: "Audit logs" } as const;
+const MANAGER_NAV = [
+  { to: "/audit-logs", label: "Audit logs" },
+  { to: "/observability-logs", label: "Observability" },
+] as const;
 
 const ROUTE_TITLE: Record<string, string> = {
   dashboard: "Overview",
@@ -28,6 +31,7 @@ const ROUTE_TITLE: Record<string, string> = {
   chat: "AI Chat",
   compliance: "Compliance",
   "audit-logs": "Audit logs",
+  "observability-logs": "Observability",
 };
 
 function layoutTitle(pathname: string): string {
@@ -49,7 +53,7 @@ export function AppLayout() {
   const location = useLocation();
   const complianceOfficer = user?.role === "compliance_officer";
   const manager = user?.role === "manager";
-  const sidebarLinks = [...NAV_ITEMS.slice(0, 5), ...(complianceOfficer ? [COMPLIANCE_NAV] : []), ...(manager ? [AUDIT_NAV] : []), ...NAV_ITEMS.slice(5)];
+  const sidebarLinks = [...NAV_ITEMS.slice(0, 5), ...(complianceOfficer ? [COMPLIANCE_NAV] : []), ...(manager ? [...MANAGER_NAV] : []), ...NAV_ITEMS.slice(5)];
 
   const headerTitle = layoutTitle(location.pathname);
 

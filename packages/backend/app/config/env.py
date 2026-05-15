@@ -111,6 +111,32 @@ class AppEnv(BaseSettings):
         description="OpenAI embeddings model (Step 5.2 RAG chunks)",
     )
 
+    langsmith_api_key: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("LANGSMITH_API_KEY", "LANGCHAIN_API_KEY"),
+        description="LangSmith / LangChain tracing API key (Step 8.1)",
+    )
+    langsmith_tracing_v2: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("LANGCHAIN_TRACING_V2"),
+        description="When false, tracing stays off even if an API key is set.",
+    )
+    langsmith_project: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("LANGCHAIN_PROJECT", "LANGSMITH_PROJECT"),
+        description="LangSmith project name (LANGCHAIN_PROJECT)",
+    )
+    langsmith_endpoint: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("LANGCHAIN_ENDPOINT", "LANGSMITH_ENDPOINT"),
+        description="LangSmith API base URL (US default; EU uses https://eu.api.smith.langchain.com)",
+    )
+    observability_log_to_db: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("OBSERVABILITY_LOG_TO_DB"),
+        description="Persist Phase 8.2 structured events to ObservabilityLog (stderr always)",
+    )
+
     def allowed_hosts_list(self) -> list[str]:
         return _comma_or_json_list(
             self.django_allowed_hosts,

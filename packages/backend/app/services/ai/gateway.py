@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
@@ -30,6 +31,8 @@ from tenacity import (
 )
 
 from app.config.env import get_env
+from app.observability.tracer import log_ai_completion
+from app.prompts.registry import PromptKey, get_prompt_spec
 
 logger = logging.getLogger(__name__)
 
@@ -278,32 +281,82 @@ def complete_chat(
     model: str | None = None,
     temperature: float = 0.2,
     fallback_provider: LLMProvider | str | None = None,
+    observability_prompt_key: PromptKey | None = None,
 ) -> LLMResult:
     """Invoke an LLM with retries; optional ``fallback_provider`` if the primary still fails.
 
     Token counts prefer provider-reported usage; otherwise tiktoken estimates.
+    When ``observability_prompt_key`` is set, emits structured logs (prompt version, tokens, latency).
     """
     prov = _parse_provider(provider)
     chosen_model = model or _default_model(prov)
+    t0 = time.perf_counter()
+
+    pk_str: str | None = None
+    pv: str | None = None
+    if observability_prompt_key is not None:
+        spec = get_prompt_spec(observability_prompt_key)
+        pk_str = spec.key
+        pv = spec.version
+
+    def _latency_ms() -> float:
+        return (time.perf_counter() - t0) * 1000
+
+    def _log_ok(res: LLMResult) -> LLMResult:
+        log_ai_completion(
+            prompt_key=pk_str,
+            prompt_version=pv,
+            provider=res.provider.value,
+            model=res.model,
+            prompt_tokens=res.prompt_tokens,
+            completion_tokens=res.completion_tokens,
+            latency_ms=_latency_ms(),
+            outcome="ok",
+        )
+        return res
+
+    def _log_err(exc: BaseException) -> None:
+        log_ai_completion(
+            prompt_key=pk_str,
+            prompt_version=pv,
+            provider=prov.value,
+            model=chosen_model,
+            prompt_tokens=None,
+            completion_tokens=None,
+            latency_ms=_latency_ms(),
+            outcome="error",
+            error=str(exc),
+        )
 
     try:
-        return _complete_single_provider(
+        res = _complete_single_provider(
             messages,
             provider=prov,
             model=chosen_model,
             temperature=temperature,
         )
-    except LLMGatewayError:
+        return _log_ok(res)
+    except LLMGatewayError as exc:
         if fallback_provider is None:
+            _log_err(exc)
             raise
         fb = _parse_provider(fallback_provider)
         if fb == prov:
+            _log_err(exc)
             raise
         fb_model = _default_model(fb)
         logger.warning("Falling back from %s to %s", prov.value, fb.value)
-        return _complete_single_provider(
-            messages,
-            provider=fb,
-            model=fb_model,
-            temperature=temperature,
-        )
+        try:
+            res = _complete_single_provider(
+                messages,
+                provider=fb,
+                model=fb_model,
+                temperature=temperature,
+            )
+            return _log_ok(res)
+        except Exception as exc2:  # — surface gateway failures after logging
+            _log_err(exc2)
+            raise
+    except Exception as exc:
+        _log_err(exc)
+        raise

@@ -31,4 +31,5 @@ urlpatterns = [
     path("api/", include("app.workflows.urls")),
     path("api/", include("app.approvals.urls")),
     path("api/", include("app.compliance.urls")),
+    path("api/", include("app.observability.urls")),
 ]

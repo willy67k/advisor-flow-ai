@@ -242,6 +242,7 @@ def _llm_summarize_notes(*, notes: str, rag_context: str = "") -> str:
         msgs,
         provider=LLMProvider.OPENAI,
         temperature=0.2,
+        observability_prompt_key=PromptKey.MEETING_SUMMARY_SUMMARIZE_SYSTEM,
     )
     return result.content.strip()
 

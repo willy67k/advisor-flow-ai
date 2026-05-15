@@ -7,8 +7,12 @@ from pathlib import Path
 
 from app.config.database_url import django_postgres_settings
 from app.config.env import get_env
+from app.observability.langsmith_bootstrap import configure_langsmith_envvars
+from app.observability.tracer import configure_structlog
 
 _env = get_env()
+configure_langsmith_envvars()
+configure_structlog()
 
 # Build paths: packages/backend/
 BASE_DIR = Path(__file__).resolve().parents[3]
@@ -24,6 +28,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "app.observability.apps.ObservabilityConfig",
     "rest_framework",
     "rest_framework_simplejwt",
     "rest_framework_simplejwt.token_blacklist",
@@ -146,7 +151,7 @@ SIMPLE_JWT = {
     "BLACKLIST_AFTER_ROTATION": True,
 }
 
-# Celery (Step 3.3): Redis broker + django-celery-results persistence
+# Redis broker + django-celery-results persistence
 CELERY_BROKER_URL = _env.celery_broker_url or "redis://127.0.0.1:6379/0"
 CELERY_RESULT_BACKEND = "django-db"
 CELERY_RESULT_EXTENDED = True
@@ -158,3 +163,6 @@ LANGGRAPH_CHECKPOINT_SQLITE_PATH = (
     if _env.langgraph_checkpoint_sqlite_path
     else BASE_DIR / "langgraph_checkpoints.sqlite3"
 )
+
+# Duplicate structlog-style events to Postgres (disable in tests via settings.test).
+OBSERVABILITY_LOG_TO_DB = _env.observability_log_to_db
