@@ -16,6 +16,7 @@ from rest_framework.views import APIView
 from app.approvals.serializers import ApprovalDecisionSerializer, ApprovalPendingSerializer
 from app.models.approval import ApprovalRequest
 from app.models.workflow import Workflow
+from app.services.audit.log import workflow_audit_snapshot, write_audit_log
 from app.services.workflows.meeting_summary import (
     graph_first_interrupt_value,
     meeting_state_to_summary_output,
@@ -93,9 +94,21 @@ class ApprovalApproveView(APIView):
         ar.decision_note = note
         ar.save(update_fields=["status", "reviewer", "decision_note"])
 
+        wf_row = Workflow.objects.get(pk=ar.workflow_id)
+        before = workflow_audit_snapshot(wf_row)
         Workflow.objects.filter(pk=ar.workflow_id).update(
             status=Workflow.Status.COMPLETED,
             result_json=payload,
+        )
+        wf_row.refresh_from_db(fields=["status", "meeting_id", "celery_task_id", "result_json"])
+        write_audit_log(
+            actor=request.user,
+            action="workflow.completed",
+            resource_type="workflow",
+            resource_id=str(ar.workflow_id),
+            before_json=before,
+            after_json=workflow_audit_snapshot(wf_row),
+            token_usage=None,
         )
 
         return Response({"workflow_id": int(ar.workflow_id), "result_json": payload})
@@ -148,9 +161,21 @@ class ApprovalRejectView(APIView):
         ar.decision_note = note
         ar.save(update_fields=["status", "reviewer", "decision_note"])
 
+        wf_row = Workflow.objects.get(pk=ar.workflow_id)
+        before = workflow_audit_snapshot(wf_row)
         Workflow.objects.filter(pk=ar.workflow_id).update(
             status=Workflow.Status.REJECTED,
             result_json=result_json,
+        )
+        wf_row.refresh_from_db(fields=["status", "meeting_id", "celery_task_id", "result_json"])
+        write_audit_log(
+            actor=request.user,
+            action="workflow.advisor_rejected",
+            resource_type="workflow",
+            resource_id=str(ar.workflow_id),
+            before_json=before,
+            after_json=workflow_audit_snapshot(wf_row),
+            token_usage=None,
         )
 
         return Response({"workflow_id": int(ar.workflow_id), "result_json": result_json})

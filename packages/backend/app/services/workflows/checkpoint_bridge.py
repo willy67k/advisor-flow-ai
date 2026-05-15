@@ -5,8 +5,11 @@ from __future__ import annotations
 import logging
 from typing import Any, TypedDict
 
+from django.contrib.auth.base_user import AbstractBaseUser
+
 from app.models.approval import ApprovalRequest
 from app.models.workflow import Workflow
+from app.services.audit.log import workflow_audit_snapshot, write_audit_log
 from app.services.workflows.meeting_summary import graph_first_interrupt_value
 
 logger = logging.getLogger(__name__)
@@ -40,7 +43,10 @@ def normalize_advisor_draft_payload(intr: dict[str, Any]) -> dict[str, Any]:
 
 
 def sync_workflow_from_graph_state(
-    wf_row: Workflow, state: dict[str, Any]
+    wf_row: Workflow,
+    state: dict[str, Any],
+    *,
+    actor: AbstractBaseUser | None = None,
 ) -> WorkflowInterruptSyncResult:
     """After ``invoke`` / ``resume``, persist workflow state when still interrupted or terminal."""
     intr = graph_first_interrupt_value(state)
@@ -51,7 +57,19 @@ def sync_workflow_from_graph_state(
 
     stage = intr.get("stage")
     if stage == _COMPLIANCE_STAGE:
+        wf_row.refresh_from_db(fields=["status", "meeting_id", "celery_task_id", "result_json"])
+        before = workflow_audit_snapshot(wf_row)
         wf_qs.update(status=Workflow.Status.WAITING_COMPLIANCE, result_json=intr)
+        wf_row.refresh_from_db(fields=["status", "meeting_id", "celery_task_id", "result_json"])
+        write_audit_log(
+            actor=actor,
+            action="workflow.awaiting_compliance",
+            resource_type="workflow",
+            resource_id=str(wf_row.pk),
+            before_json=before,
+            after_json=workflow_audit_snapshot(wf_row),
+            token_usage=None,
+        )
         logger.warning(
             "compliance_hold workflow_id=%s meeting_id=%s risk=%s",
             wf_row.pk,
@@ -60,6 +78,8 @@ def sync_workflow_from_graph_state(
         )
         return {"awaiting_compliance": True}
 
+    wf_row.refresh_from_db(fields=["status", "meeting_id", "celery_task_id", "result_json"])
+    before = workflow_audit_snapshot(wf_row)
     ar = ApprovalRequest.objects.create(
         workflow=wf_row,
         status=ApprovalRequest.Status.PENDING,
@@ -67,6 +87,18 @@ def sync_workflow_from_graph_state(
         ai_draft_json=normalize_advisor_draft_payload(intr),
     )
     wf_qs.update(status=Workflow.Status.WAITING_APPROVAL, result_json=None)
+    wf_row.refresh_from_db(fields=["status", "meeting_id", "celery_task_id", "result_json"])
+    payload = workflow_audit_snapshot(wf_row)
+    payload["approval_request_id"] = int(ar.pk)
+    write_audit_log(
+        actor=actor,
+        action="workflow.awaiting_approval",
+        resource_type="workflow",
+        resource_id=str(wf_row.pk),
+        before_json=before,
+        after_json=payload,
+        token_usage=None,
+    )
     return {"awaiting_approval": True, "approval_request_id": int(ar.pk)}
 
 

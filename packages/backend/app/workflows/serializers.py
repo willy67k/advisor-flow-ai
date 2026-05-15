@@ -3,6 +3,7 @@
 from rest_framework import serializers
 
 from app.models.approval import ApprovalRequest
+from app.models.audit_log import AuditLog
 from app.models.workflow import Workflow
 
 
@@ -62,3 +63,26 @@ class WorkflowStartSerializer(serializers.Serializer):
 
 class WorkflowStartedResponseSerializer(serializers.Serializer):
     workflow_id = serializers.IntegerField()
+
+
+class AuditLogSerializer(serializers.ModelSerializer):
+    actor_username = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AuditLog
+        fields = (
+            "id",
+            "actor",
+            "actor_username",
+            "action",
+            "resource_type",
+            "resource_id",
+            "before_json",
+            "after_json",
+            "token_usage",
+            "created_at",
+        )
+
+    def get_actor_username(self, obj: AuditLog) -> str | None:
+        u = obj.actor
+        return str(u.username) if u is not None else None

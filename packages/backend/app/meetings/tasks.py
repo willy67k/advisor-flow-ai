@@ -7,6 +7,7 @@ from django.db.models import QuerySet
 
 from app.models.meeting import Meeting
 from app.models.workflow import Workflow
+from app.services.audit.log import workflow_audit_snapshot, write_audit_log
 from app.services.workflows.checkpoint_bridge import sync_workflow_from_graph_state
 from app.services.workflows.meeting_summary import (
     graph_first_interrupt_value,
@@ -33,7 +34,18 @@ def run_meeting_summary_task(
             if wf_row.meeting_id != int(meeting_id):
                 msg = "meeting_id does not match workflow.meeting."
                 raise ValueError(msg)
+            before_proc = workflow_audit_snapshot(wf_row)
             wf_qs.update(status=Workflow.Status.PROCESSING)
+            wf_row.refresh_from_db(fields=["status", "meeting_id", "celery_task_id", "result_json"])
+            write_audit_log(
+                actor=None,
+                action="workflow.processing",
+                resource_type="workflow",
+                resource_id=str(wf_row.pk),
+                before_json=before_proc,
+                after_json=workflow_audit_snapshot(wf_row),
+                token_usage=None,
+            )
 
         m = Meeting.objects.get(pk=int(meeting_id))
         notes = str(m.notes or "")
@@ -69,9 +81,38 @@ def run_meeting_summary_task(
         structured = meeting_state_to_summary_output(state)
         payload = structured.model_dump()
 
+        wf_row.refresh_from_db(fields=["status", "meeting_id", "celery_task_id", "result_json"])
+        before_done = workflow_audit_snapshot(wf_row)
         wf_qs.update(status=Workflow.Status.COMPLETED, result_json=payload)
+        wf_row.refresh_from_db(fields=["status", "meeting_id", "celery_task_id", "result_json"])
+        write_audit_log(
+            actor=None,
+            action="workflow.completed",
+            resource_type="workflow",
+            resource_id=str(wf_row.pk),
+            before_json=before_done,
+            after_json=workflow_audit_snapshot(wf_row),
+            token_usage=None,
+        )
         return payload
     except Exception as exc:
         if wf_qs is not None:
-            wf_qs.update(status=Workflow.Status.FAILED, result_json={"error": str(exc)})
+            try:
+                row = wf_qs.select_related("meeting").get()
+                before_fail = workflow_audit_snapshot(row)
+                wf_qs.update(status=Workflow.Status.FAILED, result_json={"error": str(exc)})
+                row.refresh_from_db(
+                    fields=["status", "meeting_id", "celery_task_id", "result_json"]
+                )
+                write_audit_log(
+                    actor=None,
+                    action="workflow.failed",
+                    resource_type="workflow",
+                    resource_id=str(row.pk),
+                    before_json=before_fail,
+                    after_json=workflow_audit_snapshot(row),
+                    token_usage=None,
+                )
+            except Workflow.DoesNotExist:
+                wf_qs.update(status=Workflow.Status.FAILED, result_json={"error": str(exc)})
         raise

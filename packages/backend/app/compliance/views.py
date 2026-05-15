@@ -16,6 +16,7 @@ from rest_framework.views import APIView
 from app.compliance.permissions import IsComplianceOfficer
 from app.compliance.serializers import ComplianceNoteSerializer, CompliancePendingSerializer
 from app.models.workflow import Workflow
+from app.services.audit.log import workflow_audit_snapshot, write_audit_log
 from app.services.workflows.checkpoint_bridge import sync_workflow_from_graph_state
 from app.services.workflows.meeting_summary import (
     graph_first_interrupt_value,
@@ -73,7 +74,7 @@ class ComplianceWorkflowClearView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-        sync_workflow_from_graph_state(wf, state)
+        sync_workflow_from_graph_state(wf, state, actor=request.user)
         wf.refresh_from_db()
         return Response(
             {
@@ -116,6 +117,8 @@ class ComplianceWorkflowRejectView(APIView):
             )
 
         stored = wf.result_json if isinstance(wf.result_json, dict) else {}
+        wf.refresh_from_db(fields=["status", "meeting_id", "celery_task_id", "result_json"])
+        before = workflow_audit_snapshot(wf)
         Workflow.objects.filter(pk=wf.pk).update(
             status=Workflow.Status.REJECTED,
             result_json={
@@ -126,5 +129,15 @@ class ComplianceWorkflowRejectView(APIView):
                     "action_items": stored.get("action_items", state.get("action_items") or []),
                 },
             },
+        )
+        wf.refresh_from_db(fields=["status", "meeting_id", "celery_task_id", "result_json"])
+        write_audit_log(
+            actor=request.user,
+            action="workflow.compliance_rejected",
+            resource_type="workflow",
+            resource_id=str(wf.pk),
+            before_json=before,
+            after_json=workflow_audit_snapshot(wf),
+            token_usage=None,
         )
         return Response({"workflow_id": int(wf.pk), "status": Workflow.Status.REJECTED})

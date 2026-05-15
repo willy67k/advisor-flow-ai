@@ -12,10 +12,14 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from app.meetings.tasks import run_meeting_summary_task
+from app.models.audit_log import AuditLog
 from app.models.meeting import Meeting
 from app.models.workflow import Workflow
+from app.services.audit.log import workflow_audit_snapshot, write_audit_log
 from app.worker import celery_app
+from app.workflows.permissions import IsManager
 from app.workflows.serializers import (
+    AuditLogSerializer,
     WorkflowListItemSerializer,
     WorkflowSerializer,
     WorkflowStartedResponseSerializer,
@@ -78,6 +82,16 @@ class WorkflowStartView(APIView):
         wf = Workflow.objects.create(meeting=meeting)
         async_res = run_meeting_summary_task.delay(meeting_id, wf.pk)
         Workflow.objects.filter(pk=wf.pk).update(celery_task_id=async_res.id)
+        wf.refresh_from_db(fields=["status", "meeting_id", "celery_task_id", "result_json"])
+        write_audit_log(
+            actor=request.user,
+            action="workflow.run_enqueued",
+            resource_type="workflow",
+            resource_id=str(wf.pk),
+            before_json=None,
+            after_json=workflow_audit_snapshot(wf),
+            token_usage=None,
+        )
 
         return Response({"workflow_id": wf.pk}, status=status.HTTP_201_CREATED)
 
@@ -96,3 +110,29 @@ class WorkflowDetailView(APIView):
         payload = WorkflowSerializer(wf).data
         celery_state = _celery_state_for_workflow(wf)
         return Response({"celery_state": celery_state, **payload})
+
+
+class AuditLogPagination(PageNumberPagination):
+    page_size = 25
+    page_size_query_param = "page_size"
+    max_page_size = 50
+
+
+class AuditLogListView(ListAPIView):
+    """Paginated audit trail — managers only (optional ``resource_type`` / ``resource_id`` filters)."""
+
+    permission_classes = (IsAuthenticated, IsManager)
+    serializer_class = AuditLogSerializer
+    pagination_class = AuditLogPagination
+
+    def get_queryset(self):
+        qs = AuditLog.objects.select_related("actor").all()
+
+        resource_type = self.request.query_params.get("resource_type")
+        resource_id = self.request.query_params.get("resource_id")
+        if resource_type is not None and str(resource_type).strip():
+            qs = qs.filter(resource_type__icontains=str(resource_type).strip())
+        if resource_id:
+            qs = qs.filter(resource_id=str(resource_id))
+
+        return qs.order_by("-id")
