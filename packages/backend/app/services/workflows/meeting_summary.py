@@ -17,6 +17,7 @@ from openai import OpenAI
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.config.env import get_env
+from app.models.meeting import Meeting
 from app.prompts import PromptKey, prompt_template
 from app.services.ai.gateway import ChatMessage, LLMProvider, complete_chat
 from app.services.ai.retrieval import retrieve_context_for_meeting_notes
@@ -287,7 +288,14 @@ def _node_retrieve_context(state: MeetingWorkflowState) -> MeetingWorkflowState:
     notes = str(state.get("notes") or "")
     if mid is None:
         return {"rag_context": ""}
-    rag = retrieve_context_for_meeting_notes(meeting_id=int(mid), query_text=notes)
+    row = Meeting.objects.filter(pk=int(mid)).only("advisor_id").first()
+    if row is None:
+        return {"rag_context": ""}
+    rag = retrieve_context_for_meeting_notes(
+        meeting_id=int(mid),
+        scoped_advisor_id=int(row.advisor_id),
+        query_text=notes,
+    )
     return {"rag_context": rag}
 
 

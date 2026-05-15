@@ -10,6 +10,7 @@ from pgvector.django import CosineDistance
 
 from app.models.document import Document
 from app.models.document_chunk import DocumentChunk
+from app.models.meeting import Meeting
 from app.services.documents.embeddings import embed_texts_batch
 
 logger = logging.getLogger(__name__)
@@ -26,10 +27,14 @@ def _truncate(text: str, max_chars: int) -> str:
     return t[:max_chars]
 
 
-def fallback_query_text_for_meeting_documents(meeting_id: int) -> str:
+def fallback_query_text_for_meeting_documents(meeting_id: int, *, scoped_advisor_id: int) -> str:
     """Embedding query when the advisor left meeting notes blank but uploaded PDFs are READY."""
     doc = (
-        Document.objects.filter(meeting_id=int(meeting_id), status=Document.Status.READY)
+        Document.objects.filter(
+            meeting_id=int(meeting_id),
+            meeting__advisor_id=int(scoped_advisor_id),
+            status=Document.Status.READY,
+        )
         .exclude(extracted_text__exact="")
         .order_by("id")
         .first()
@@ -39,6 +44,7 @@ def fallback_query_text_for_meeting_documents(meeting_id: int) -> str:
     chunk = (
         DocumentChunk.objects.filter(
             document__meeting_id=int(meeting_id),
+            document__meeting__advisor_id=int(scoped_advisor_id),
             document__status=Document.Status.READY,
         )
         .order_by("id")
@@ -76,6 +82,7 @@ def assemble_retrieved_context(
 def search_similar_chunks(
     *,
     meeting_id: int,
+    scoped_advisor_id: int,
     query_embedding: list[float],
     top_k: int = DEFAULT_TOP_K,
 ) -> list[DocumentChunk]:
@@ -83,6 +90,7 @@ def search_similar_chunks(
     qs: QuerySet[DocumentChunk] = (
         DocumentChunk.objects.filter(
             document__meeting_id=int(meeting_id),
+            document__meeting__advisor_id=int(scoped_advisor_id),
             document__status=Document.Status.READY,
         )
         .select_related("document")
@@ -95,6 +103,7 @@ def search_similar_chunks(
 def retrieve_context_for_meeting_notes(
     *,
     meeting_id: int,
+    scoped_advisor_id: int,
     query_text: str,
     top_k: int = DEFAULT_TOP_K,
     max_chars: int = DEFAULT_MAX_CHARS,
@@ -104,18 +113,28 @@ def retrieve_context_for_meeting_notes(
     READY documents, derive query text from ``extracted_text`` or the first chunk so upload-only
     workflows still retrieve context.
 
+    ``scoped_advisor_id`` must be the owning advisor of ``meeting_id``; callers should pass the
+    authenticated advisor (or derive it from ``Meeting.advisor_id`` only after verifying API access).
+
     Returns empty string when there is nothing indexed, no embedding key, or on recoverable DB errors.
     """
+    if not Meeting.objects.filter(pk=int(meeting_id), advisor_id=int(scoped_advisor_id)).exists():
+        return ""
+
     query = _truncate(query_text, _QUERY_CHAR_CAP).strip()
     if not query:
         query = _truncate(
-            fallback_query_text_for_meeting_documents(meeting_id), _QUERY_CHAR_CAP
+            fallback_query_text_for_meeting_documents(
+                meeting_id, scoped_advisor_id=int(scoped_advisor_id)
+            ),
+            _QUERY_CHAR_CAP,
         ).strip()
     if not query:
         return ""
 
     if not DocumentChunk.objects.filter(
         document__meeting_id=int(meeting_id),
+        document__meeting__advisor_id=int(scoped_advisor_id),
         document__status=Document.Status.READY,
     ).exists():
         logger.debug(
@@ -130,6 +149,7 @@ def retrieve_context_for_meeting_notes(
             return ""
         rows = search_similar_chunks(
             meeting_id=int(meeting_id),
+            scoped_advisor_id=int(scoped_advisor_id),
             query_embedding=vectors[0],
             top_k=top_k,
         )

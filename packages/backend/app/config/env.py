@@ -105,6 +105,14 @@ class AppEnv(BaseSettings):
         default="gemini-2.0-flash",
         description="AI_GEMINI_DEFAULT_MODEL",
     )
+    ai_chat_scope_model: str = Field(
+        default="",
+        validation_alias=AliasChoices("AI_CHAT_SCOPE_MODEL"),
+        description=(
+            "Optional cheaper model ID for workspace chat relevance classification only. "
+            "When empty, defaults to gpt-4o-mini (OpenAI) or AI_*_DEFAULT_MODEL for others."
+        ),
+    )
     openai_embedding_model: str = Field(
         default="text-embedding-3-small",
         validation_alias=AliasChoices("OPENAI_EMBEDDING_MODEL"),

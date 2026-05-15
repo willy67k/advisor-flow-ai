@@ -24,7 +24,33 @@ def test_retrieve_skips_embedding_when_no_chunks():
     )
 
     with patch("app.services.ai.retrieval.embed_texts_batch") as emb:
-        out = retrieve_context_for_meeting_notes(meeting_id=m.pk, query_text="hello agenda")
+        out = retrieve_context_for_meeting_notes(
+            meeting_id=m.pk,
+            scoped_advisor_id=user.pk,
+            query_text="hello agenda",
+        )
+        emb.assert_not_called()
+    assert out == ""
+
+
+@pytest.mark.django_db
+def test_retrieve_returns_empty_when_scoped_advisor_does_not_own_meeting():
+    owner = User.objects.create_user(username="rag_owner", password="pw", role=User.Role.ADVISOR)
+    other = User.objects.create_user(username="rag_other", password="pw", role=User.Role.ADVISOR)
+    c = Client.objects.create(name="Co2", email="c2@test", advisor=owner)
+    m = Meeting.objects.create(
+        title="Secret",
+        date="2026-01-03",
+        notes="Discuss budget.",
+        client=c,
+        advisor=owner,
+    )
+    with patch("app.services.ai.retrieval.embed_texts_batch") as emb:
+        out = retrieve_context_for_meeting_notes(
+            meeting_id=m.pk,
+            scoped_advisor_id=other.pk,
+            query_text="hello agenda",
+        )
         emb.assert_not_called()
     assert out == ""
 

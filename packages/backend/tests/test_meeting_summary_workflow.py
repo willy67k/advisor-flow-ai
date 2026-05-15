@@ -6,6 +6,9 @@ import pytest
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.types import Command
 
+from app.accounts.models import User
+from app.models.client import Client
+from app.models.meeting import Meeting
 from app.services.workflows.meeting_summary import (
     MeetingActionItem,
     MeetingSummaryOutput,
@@ -112,6 +115,16 @@ def test_high_risk_summary_interrupts_compliance_before_advisor():
 
 @pytest.mark.django_db
 def test_empty_notes_still_summarizes_when_rag_context_resolved():
+    user = User.objects.create_user(username="wf_rag_owner", password="pw", role=User.Role.ADVISOR)
+    client_row = Client.objects.create(name="RagCo", email="rag@test", advisor=user)
+    meeting_row = Meeting.objects.create(
+        title="RAG meeting",
+        date="2026-02-01",
+        notes="",
+        client=client_row,
+        advisor=user,
+    )
+
     def capture_summarize(*, notes: str, rag_context: str = "") -> str:
         assert "document excerpts" in notes.lower() or "No typed meeting notes" in notes
         assert "PDF body" in rag_context
@@ -134,7 +147,7 @@ def test_empty_notes_still_summarizes_when_rag_context_resolved():
         mem = MemorySaver()
         graph = build_meeting_summary_graph(mem)
         cfg = {"configurable": {"thread_id": "notes-empty-rag"}}
-        halted = graph.invoke({"notes": "", "meeting_id": 1}, cfg)
+        halted = graph.invoke({"notes": "", "meeting_id": meeting_row.pk}, cfg)
 
     assert graph_first_interrupt_value(halted) is not None
     assert halted.get("summary") == "Summary-from-upload"

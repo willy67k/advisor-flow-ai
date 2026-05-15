@@ -1,7 +1,10 @@
 # Yarn workspace dev server (`packages/frontend`). Build context: repo root `.`
 FROM node:20-bookworm-slim
 
-RUN corepack enable && corepack prepare yarn@1.22.22 --activate
+# Node 20 ships a `/usr/local/bin/yarn` stub/corepack shim that often fails during `docker build` (exit 127).
+# Replace it with Yarn classic 1.x for this Yarn v1 workspace + lockfile.
+RUN rm -f /usr/local/bin/yarn /usr/local/bin/yarnpkg \
+    && npm install -g yarn@1.22.22
 
 WORKDIR /workspace
 
@@ -10,7 +13,8 @@ COPY packages/frontend/package.json ./packages/frontend/
 COPY packages/backend/package.json ./packages/backend/
 
 ENV YARN_NETWORK_TIMEOUT=600000
-RUN yarn install --frozen-lockfile
+# Workspace `backend` declares `install: uv sync` — not available in this Node-only image; skip lifecycle scripts here.
+RUN yarn install --frozen-lockfile --ignore-scripts
 
 COPY turbo.json ./
 COPY packages/frontend ./packages/frontend

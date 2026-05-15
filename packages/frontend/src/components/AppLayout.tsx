@@ -7,13 +7,12 @@ import { useAuthStore } from "../stores/authStore";
 const navClass = ({ isActive }: { readonly isActive: boolean }) =>
   ["block cursor-pointer rounded-md px-3 py-2 text-sm font-medium transition-colors", isActive ? "bg-slate-700 text-white" : "text-slate-300 hover:bg-slate-800 hover:text-white"].join(" ");
 
-const NAV_ITEMS = [
+const WORKSPACE_NAV = [
   { to: "/dashboard", label: "Overview" },
   { to: "/clients", label: "Clients" },
   { to: "/meetings", label: "Meetings" },
   { to: "/documents", label: "Documents" },
   { to: "/meeting-summary", label: "Meeting summary" },
-  { to: "/chat", label: "AI Chat" },
 ] as const;
 
 const COMPLIANCE_NAV = { to: "/compliance", label: "Compliance" } as const;
@@ -53,7 +52,8 @@ export function AppLayout() {
   const location = useLocation();
   const complianceOfficer = user?.role === "compliance_officer";
   const manager = user?.role === "manager";
-  const sidebarLinks = [...NAV_ITEMS.slice(0, 5), ...(complianceOfficer ? [COMPLIANCE_NAV] : []), ...(manager ? [...MANAGER_NAV] : []), ...NAV_ITEMS.slice(5)];
+  const chatLink = [{ to: "/chat", label: "AI Chat" }] as const;
+  const sidebarLinks = [...WORKSPACE_NAV, ...(complianceOfficer ? [COMPLIANCE_NAV] : []), ...(manager ? [...MANAGER_NAV] : []), ...chatLink];
 
   const headerTitle = layoutTitle(location.pathname);
 

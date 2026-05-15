@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     "drf_spectacular",
     "django_celery_results",
     "app.accounts",
+    "app.chat.apps.ChatConfig",
     "app.clients",
     "app.meetings",
     "app.documents",
