@@ -11,7 +11,7 @@ const schema = z.object({
   password: z.string().min(1, "Password required"),
 });
 
-type FormValues = z.infer;
+type FormValues = z.infer<typeof schema>;
 
 export function LoginPage() {
   const navigate = useNavigate();

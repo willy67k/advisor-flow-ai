@@ -16,13 +16,16 @@ const NAV_ITEMS = [
   { to: "/chat", label: "AI Chat" },
 ] as const;
 
-const ROUTE_TITLE: Record = {
+const COMPLIANCE_NAV = { to: "/compliance", label: "Compliance" } as const;
+
+const ROUTE_TITLE: Record<string, string> = {
   dashboard: "Overview",
   clients: "Clients",
   meetings: "Meetings",
   documents: "Documents",
   "meeting-summary": "Meeting summary",
   chat: "AI Chat",
+  compliance: "Compliance",
 };
 
 function layoutTitle(pathname: string): string {
@@ -42,6 +45,8 @@ function layoutTitle(pathname: string): string {
 export function AppLayout() {
   const user = useAuthStore((s) => s.user);
   const location = useLocation();
+  const complianceOfficer = user?.role === "compliance_officer";
+  const sidebarLinks = [...NAV_ITEMS.slice(0, 5), ...(complianceOfficer ? [COMPLIANCE_NAV] : []), ...NAV_ITEMS.slice(5)];
 
   const headerTitle = layoutTitle(location.pathname);
 
@@ -58,7 +63,7 @@ export function AppLayout() {
           <p className="font-semibold text-slate-100">Workspace</p>
         </div>
         <nav className="flex flex-1 flex-col gap-1 p-3">
-          {NAV_ITEMS.map(({ to, label }) => (
+          {sidebarLinks.map(({ to, label }) => (
             <NavLink key={to} className={(p) => navClass(p)} end={to !== "/meetings"} to={to}>
               {label}
             </NavLink>

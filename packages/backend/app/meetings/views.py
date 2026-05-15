@@ -47,6 +47,8 @@ class MeetingViewSet(viewsets.ModelViewSet):
                     "summary": None,
                     "action_items": [],
                     "approval_decision_note": None,
+                    "compliance_rejected": False,
+                    "compliance_decision_note": None,
                 }
             )
 
@@ -59,6 +61,12 @@ class MeetingViewSet(viewsets.ModelViewSet):
 
         approved = wf.status == Workflow.Status.COMPLETED and bool(wf.result_json)
         payload = wf.result_json if isinstance(wf.result_json, dict) else {}
+        compliance_rejected = bool(payload.get("compliance_rejected"))
+        compliance_note = (
+            str(payload.get("compliance_decision_note") or "")
+            if wf.status == Workflow.Status.REJECTED and compliance_rejected
+            else None
+        )
 
         return Response(
             {
@@ -72,5 +80,7 @@ class MeetingViewSet(viewsets.ModelViewSet):
                 "approval_decision_note": (
                     payload.get("approval_decision_note") if approved else None
                 ),
+                "compliance_rejected": compliance_rejected,
+                "compliance_decision_note": compliance_note,
             }
         )

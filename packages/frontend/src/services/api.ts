@@ -11,9 +11,9 @@ export const api = axios.create({
   },
 });
 
-let refreshPromise: Promise | null = null;
+let refreshPromise: Promise<string> | null = null;
 
-async function refreshAccessToken(): Promise {
+async function refreshAccessToken(): Promise<string> {
   const refreshToken = useAuthStore.getState().refreshToken;
   if (!refreshToken) {
     throw new Error("Missing refresh token");
@@ -91,7 +91,7 @@ export async function registerRequest(body: RegisterRequestBody) {
   useAuthStore.getState().setUser(data.user);
 }
 
-export async function fetchMe(): Promise {
+export async function fetchMe(): Promise<MeResponse> {
   const { data } = await api.get<MeResponse>("/api/auth/me/");
   useAuthStore.getState().setUser(data);
   return data;

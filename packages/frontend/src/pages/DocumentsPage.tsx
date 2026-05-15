@@ -3,15 +3,14 @@ import { useState } from "react";
 
 import { fetchDocumentsByMeeting } from "../services/documentsApi";
 import { fetchMeetings } from "../services/meetingsApi";
-import type { DocumentStatus } from "../types/documents";
 
-const STATUS_LABEL: Record = {
+const STATUS_LABEL: Record<string, string> = {
   uploaded: "Queued",
   processing: "Processing",
   ready: "Ready",
 };
 
-const STATUS_COLOR: Record = {
+const STATUS_COLOR: Record<string, string> = {
   uploaded: "bg-slate-700 text-slate-300",
   processing: "bg-amber-500/20 text-amber-400",
   ready: "bg-emerald-500/20 text-emerald-400",

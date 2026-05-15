@@ -48,6 +48,7 @@ def _celery_state_for_workflow(wf: Workflow) -> str | None:
             Workflow.Status.REJECTED: "SUCCESS",
             Workflow.Status.PROCESSING: "STARTED",
             Workflow.Status.PENDING: "PENDING",
+            Workflow.Status.WAITING_COMPLIANCE: "SUCCESS",
             Workflow.Status.WAITING_APPROVAL: "SUCCESS",
         }.get(wf.status, "PENDING")
 

@@ -6,9 +6,10 @@ import { fetchMeeting, fetchMeetingAiSummary } from "../services/meetingsApi";
 
 function statusLabel(status: string | null): string {
   if (!status) return "—";
-  const map: Record = {
+  const map: Record<string, string> = {
     pending: "Pending",
     processing: "Processing",
+    waiting_compliance: "Awaiting compliance",
     waiting_approval: "Awaiting approval",
     completed: "Completed",
     failed: "Failed",
@@ -39,7 +40,10 @@ export function MeetingDetailPage() {
       if (!d?.workflow_status) return false;
       if (d.has_approved_summary) return false;
       if (d.workflow_status === "failed" || d.workflow_status === "rejected") return false;
-      return 5000;
+      if (d.workflow_status === "processing" || d.workflow_status === "waiting_approval" || d.workflow_status === "waiting_compliance") {
+        return 5000;
+      }
+      return false;
     },
   });
 
@@ -140,12 +144,19 @@ export function MeetingDetailPage() {
             <p>
               A workflow is linked to this meeting, but there is no approved summary visible here yet (<span className="font-medium text-slate-300">{statusLabel(ai.workflow_status)}</span>).
             </p>
-            {(ai.workflow_status === "waiting_approval" || (ai.pending_approval_id ?? 0) > 0 || ai.workflow_status === "processing") && (
+            {ai.compliance_rejected ? (
+              <div className="rounded-lg border border-rose-500/35 bg-rose-950/25 px-4 py-3 text-rose-100/95">
+                <p className="text-xs font-semibold tracking-wide text-rose-300 uppercase">Compliance outcome</p>
+                <p className="mt-2 text-sm text-rose-100/90">This summary run was stopped at compliance. Revise notes or strategy language and start a new workflow from Meeting summary when ready.</p>
+                {(ai.compliance_decision_note ?? "").trim() ? <p className="mt-2 text-sm whitespace-pre-wrap text-rose-200/80">{ai.compliance_decision_note}</p> : null}
+              </div>
+            ) : null}
+            {(ai.workflow_status === "waiting_compliance" || ai.workflow_status === "waiting_approval" || (ai.pending_approval_id ?? 0) > 0 || ai.workflow_status === "processing") && (
               <p>
                 <Link className="font-medium text-emerald-400 hover:text-emerald-300" to="/meeting-summary">
                   Open Meeting summary
                 </Link>{" "}
-                {ai.workflow_status === "waiting_approval" ? "to review and approve the draft." : "to monitor progress."}
+                {ai.workflow_status === "waiting_compliance" ? "to track compliance review and approval." : ai.workflow_status === "waiting_approval" ? "to review and approve the draft." : "to monitor progress."}
               </p>
             )}
           </div>

@@ -1,12 +1,14 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
 import { AppLayout } from "../components/AppLayout.tsx";
+import { ComplianceOfficerRoute } from "../components/ComplianceOfficerRoute.tsx";
 import { GuestRoute } from "../components/GuestRoute.tsx";
 import { ProtectedRoute } from "../components/ProtectedRoute.tsx";
 import { AIChatPage } from "../features/ai-chat/AIChatPage.tsx";
 import { LoginPage } from "../features/auth/LoginPage.tsx";
 import { RegisterPage } from "../features/auth/RegisterPage.tsx";
 import { ClientsPage } from "../pages/ClientsPage.tsx";
+import { ComplianceReviewsPage } from "../pages/ComplianceReviewsPage.tsx";
 import { DashboardPage } from "../pages/DashboardPage.tsx";
 import { DocumentsPage } from "../pages/DocumentsPage.tsx";
 import { MeetingDetailPage } from "../pages/MeetingDetailPage.tsx";
@@ -31,6 +33,9 @@ export function AppRouter() {
             <Route element={<MeetingsPage />} path="meetings" />
             <Route element={<DocumentsPage />} path="documents" />
             <Route element={<MeetingSummaryPage />} path="meeting-summary" />
+            <Route element={<ComplianceOfficerRoute />}>
+              <Route element={<ComplianceReviewsPage />} path="compliance" />
+            </Route>
             <Route element={<Navigate replace to="/meeting-summary" />} path="workflows" />
             <Route element={<Navigate replace to="/meeting-summary" />} path="approvals" />
             <Route element={<AIChatPage />} path="chat" />

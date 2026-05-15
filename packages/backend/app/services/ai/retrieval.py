@@ -26,6 +26,29 @@ def _truncate(text: str, max_chars: int) -> str:
     return t[:max_chars]
 
 
+def fallback_query_text_for_meeting_documents(meeting_id: int) -> str:
+    """Embedding query when the advisor left meeting notes blank but uploaded PDFs are READY."""
+    doc = (
+        Document.objects.filter(meeting_id=int(meeting_id), status=Document.Status.READY)
+        .exclude(extracted_text__exact="")
+        .order_by("id")
+        .first()
+    )
+    if doc is not None:
+        return _truncate(str(doc.extracted_text), _QUERY_CHAR_CAP)
+    chunk = (
+        DocumentChunk.objects.filter(
+            document__meeting_id=int(meeting_id),
+            document__status=Document.Status.READY,
+        )
+        .order_by("id")
+        .first()
+    )
+    if chunk is not None:
+        return _truncate(chunk.content, _QUERY_CHAR_CAP)
+    return ""
+
+
 def assemble_retrieved_context(
     chunks: Iterable[DocumentChunk],
     *,
@@ -77,11 +100,17 @@ def retrieve_context_for_meeting_notes(
     max_chars: int = DEFAULT_MAX_CHARS,
 ) -> str:
     """
-    Embed trimmed meeting notes as the query vector, rank chunks, assemble prompt context.
+    Embed ``query_text`` as the query vector when non-empty; if notes are blank but the meeting has
+    READY documents, derive query text from ``extracted_text`` or the first chunk so upload-only
+    workflows still retrieve context.
 
     Returns empty string when there is nothing indexed, no embedding key, or on recoverable DB errors.
     """
-    query = _truncate(query_text, _QUERY_CHAR_CAP)
+    query = _truncate(query_text, _QUERY_CHAR_CAP).strip()
+    if not query:
+        query = _truncate(
+            fallback_query_text_for_meeting_documents(meeting_id), _QUERY_CHAR_CAP
+        ).strip()
     if not query:
         return ""
 
@@ -114,6 +143,7 @@ def retrieve_context_for_meeting_notes(
 
 __all__ = [
     "assemble_retrieved_context",
+    "fallback_query_text_for_meeting_documents",
     "retrieve_context_for_meeting_notes",
     "search_similar_chunks",
 ]

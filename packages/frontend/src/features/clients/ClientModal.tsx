@@ -12,7 +12,7 @@ const schema = z.object({
   phone: z.string().min(1, "Phone is required"),
 });
 
-type FormValues = z.infer;
+type FormValues = z.infer<typeof schema>;
 
 interface Props {
   readonly editTarget: Client | null;
@@ -91,7 +91,7 @@ export function ClientModal({ editTarget, onClose }: Props) {
             {errors.phone ? <p className="text-xs text-rose-400">{errors.phone.message}</p> : null}
           </div>
 
-          {createMut.error ?? updateMut.error ? <p className="text-sm text-rose-400">Something went wrong. Please try again.</p> : null}
+          {(createMut.error ?? updateMut.error) ? <p className="text-sm text-rose-400">Something went wrong. Please try again.</p> : null}
 
           <div className="flex justify-end gap-3 pt-2">
             <button className="rounded-lg border border-slate-600 px-4 py-2 text-sm font-medium text-slate-300 hover:border-slate-500 hover:bg-slate-800" disabled={busy} type="button" onClick={onClose}>

@@ -8,13 +8,13 @@ interface Props {
   readonly meetingId: number;
 }
 
-const STATUS_LABEL: Record = {
+const STATUS_LABEL: Record<string, string> = {
   uploaded: "Queued",
   processing: "Processing…",
   ready: "Ready",
 };
 
-const STATUS_COLOR: Record = {
+const STATUS_COLOR: Record<string, string> = {
   uploaded: "text-slate-400",
   processing: "text-amber-400",
   ready: "text-emerald-400",

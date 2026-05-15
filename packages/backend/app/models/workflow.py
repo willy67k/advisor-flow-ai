@@ -11,6 +11,7 @@ class Workflow(models.Model):
     class Status(models.TextChoices):
         PENDING = "pending", "Pending"
         PROCESSING = "processing", "Processing"
+        WAITING_COMPLIANCE = "waiting_compliance", "Waiting compliance"
         WAITING_APPROVAL = "waiting_approval", "Waiting approval"
         COMPLETED = "completed", "Completed"
         FAILED = "failed", "Failed"

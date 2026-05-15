@@ -6,7 +6,7 @@ type Paginated<T> = {
   readonly results: readonly T[];
 };
 
-export async function uploadDocument(meetingId: number, file: File): Promise {
+export async function uploadDocument(meetingId: number, file: File): Promise<Document> {
   const formData = new FormData();
   formData.append("meeting", String(meetingId));
   formData.append("file", file);
@@ -16,13 +16,13 @@ export async function uploadDocument(meetingId: number, file: File): Promise {
   return data;
 }
 
-export async function fetchDocument(id: number): Promise {
+export async function fetchDocument(id: number): Promise<Document> {
   const { data } = await api.get<Document>(`/api/documents/${id}`);
   return data;
 }
 
-export async function fetchDocumentsByMeeting(meetingId: number): Promise {
-  const { data } = await api.get<Paginated>("/api/documents/", {
+export async function fetchDocumentsByMeeting(meetingId: number): Promise<Document[]> {
+  const { data } = await api.get<Paginated<Document>>("/api/documents/", {
     params: { meeting: meetingId, page_size: 50 },
   });
   return [...data.results];

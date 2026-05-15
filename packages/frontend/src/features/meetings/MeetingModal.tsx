@@ -11,10 +11,10 @@ const schema = z.object({
   title: z.string().min(1, "Title is required"),
   date: z.string().min(1, "Date is required"),
   notes: z.string(),
-  client: z.number({ invalid_type_error: "Select a client" }).int().positive("Select a client"),
+  client: z.number({ message: "Select a client" }).int().positive("Select a client"),
 });
 
-type FormValues = z.infer;
+type FormValues = z.infer<typeof schema>;
 
 interface Props {
   readonly editTarget: Meeting | null;
@@ -120,7 +120,7 @@ export function MeetingModal({ editTarget, onClose }: Props) {
             />
           </div>
 
-          {createMut.error ?? updateMut.error ? <p className="text-sm text-rose-400">Something went wrong. Please try again.</p> : null}
+          {(createMut.error ?? updateMut.error) ? <p className="text-sm text-rose-400">Something went wrong. Please try again.</p> : null}
 
           <div className="flex justify-end gap-3 pt-2">
             <button className="rounded-lg border border-slate-600 px-4 py-2 text-sm font-medium text-slate-300 hover:border-slate-500 hover:bg-slate-800" disabled={busy} type="button" onClick={onClose}>

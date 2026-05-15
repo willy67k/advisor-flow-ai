@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useState } from "react";
 
 import { fetchWorkflow } from "../../services/workflowsApi";
 import type { Workflow, WorkflowStatus } from "../../types/workflows";
@@ -10,97 +10,94 @@ interface Node {
 
 const NODES: Node[] = [
   { key: "start", label: "Start" },
-  { key: "retrieve_context", label: "Retrieve Context" },
-  { key: "generate_summary", label: "Generate Summary" },
-  { key: "extract_action_items", label: "Extract Action Items" },
-  { key: "compliance_check", label: "Compliance Check" },
-  { key: "wait_for_approval", label: "Awaiting Approval" },
-  { key: "end", label: "End" },
+  { key: "retrieve_context", label: "Retrieve context" },
+  { key: "generate_summary", label: "Generate summary" },
+  { key: "extract_action_items", label: "Action items" },
+  { key: "compliance_check", label: "Compliance scan" },
+  { key: "wait_for_compliance", label: "Compliance review" },
+  { key: "wait_for_advisor_approval", label: "Advisor approval" },
+  { key: "end", label: "Done" },
 ];
 
 type NodeState = "done" | "active" | "waiting" | "failed" | "pending";
 
-function resolveNodeStates(status: WorkflowStatus): Map {
+function resolveNodeStates(status: WorkflowStatus, resultJson: Record<string, unknown> | null): Map<string, NodeState> {
   const m = new Map<string, NodeState>();
+  const keys = NODES.map((n) => n.key);
 
-  const allKeys = NODES.map((n) => n.key);
-
-  const markUpTo = (lastDone: string, activeKey?: string, failedKey?: string) => {
-    let pastActive = false;
-    for (const key of allKeys) {
-      if (failedKey && key === failedKey) {
-        m.set(key, "failed");
-        pastActive = true;
-        continue;
-      }
-      if (activeKey && key === activeKey) {
-        m.set(key, "active");
-        continue;
-      }
-      if (key === lastDone) {
-        m.set(key, "done");
-        continue;
-      }
-      if (pastActive) {
-        m.set(key, "pending");
-        continue;
-      }
-      const doneKeys = allKeys.slice(0, allKeys.indexOf(lastDone) + 1);
-      m.set(key, doneKeys.includes(key) ? "done" : "pending");
+  const fillDoneThrough = (lastDoneKey: string) => {
+    const cut = keys.indexOf(lastDoneKey);
+    for (let i = 0; i < keys.length; i++) {
+      m.set(keys[i], i <= cut ? "done" : "pending");
     }
   };
 
   switch (status) {
     case "pending":
-      for (const k of allKeys) m.set(k, k === "start" ? "active" : "pending");
+      for (const k of keys) {
+        m.set(k, k === "start" ? "active" : "pending");
+      }
       break;
-    case "processing":
+    case "processing": {
       m.set("start", "done");
       m.set("retrieve_context", "done");
       m.set("generate_summary", "active");
-      m.set("extract_action_items", "pending");
-      m.set("compliance_check", "pending");
-      m.set("wait_for_approval", "pending");
+      for (const k of keys) {
+        if (!m.has(k)) {
+          m.set(k, "pending");
+        }
+      }
+      break;
+    }
+    case "waiting_compliance":
+      fillDoneThrough("compliance_check");
+      m.set("wait_for_compliance", "active");
+      m.set("wait_for_advisor_approval", "pending");
       m.set("end", "pending");
       break;
     case "waiting_approval":
-      m.set("start", "done");
-      m.set("retrieve_context", "done");
-      m.set("generate_summary", "done");
-      m.set("extract_action_items", "done");
-      m.set("compliance_check", "done");
-      m.set("wait_for_approval", "active");
+      fillDoneThrough("wait_for_compliance");
+      m.set("wait_for_advisor_approval", "active");
       m.set("end", "pending");
       break;
     case "completed":
-      for (const k of allKeys) m.set(k, "done");
+      for (const k of keys) {
+        m.set(k, "done");
+      }
       break;
-    case "failed":
-      markUpTo("generate_summary", undefined, "generate_summary");
+    case "failed": {
       m.set("start", "done");
       m.set("retrieve_context", "done");
       m.set("generate_summary", "failed");
-      m.set("extract_action_items", "pending");
-      m.set("compliance_check", "pending");
-      m.set("wait_for_approval", "pending");
+      for (const k of keys) {
+        if (!m.has(k)) {
+          m.set(k, "pending");
+        }
+      }
+      break;
+    }
+    case "rejected": {
+      const complianceRejected = Boolean(resultJson?.compliance_rejected);
+      fillDoneThrough("compliance_check");
+      if (complianceRejected) {
+        m.set("wait_for_compliance", "failed");
+        m.set("wait_for_advisor_approval", "pending");
+      } else {
+        m.set("wait_for_compliance", "done");
+        m.set("wait_for_advisor_approval", "failed");
+      }
       m.set("end", "pending");
       break;
-    case "rejected":
-      m.set("start", "done");
-      m.set("retrieve_context", "done");
-      m.set("generate_summary", "done");
-      m.set("extract_action_items", "done");
-      m.set("compliance_check", "done");
-      m.set("wait_for_approval", "failed");
-      m.set("end", "pending");
-      break;
+    }
     default:
-      for (const k of allKeys) m.set(k, "pending");
+      for (const k of keys) {
+        m.set(k, "pending");
+      }
   }
   return m;
 }
 
-const NODE_ICONS: Record = {
+const NODE_ICONS: Record<NodeState, ReactNode> = {
   done: (
     <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
       <path clipRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" fillRule="evenodd" />
@@ -120,7 +117,7 @@ const NODE_ICONS: Record = {
   pending: <span className="h-2 w-2 rounded-full bg-current" />,
 };
 
-const NODE_COLORS: Record = {
+const NODE_COLORS: Record<NodeState, string> = {
   done: "bg-emerald-500/20 text-emerald-400 border-emerald-500/40",
   active: "bg-amber-500/20 text-amber-400 border-amber-500/40",
   waiting: "bg-slate-700/60 text-slate-400 border-slate-600",
@@ -128,19 +125,21 @@ const NODE_COLORS: Record = {
   pending: "bg-slate-800/60 text-slate-600 border-slate-700/40",
 };
 
-const STATUS_BADGE: Record = {
+const STATUS_BADGE: Record<WorkflowStatus, string> = {
   pending: "bg-slate-700 text-slate-300",
   processing: "bg-amber-500/20 text-amber-400",
+  waiting_compliance: "bg-violet-500/20 text-violet-300",
   waiting_approval: "bg-blue-500/20 text-blue-400",
   completed: "bg-emerald-500/20 text-emerald-400",
   failed: "bg-rose-500/20 text-rose-400",
   rejected: "bg-rose-500/20 text-rose-400",
 };
 
-const STATUS_LABEL: Record = {
+const STATUS_LABEL: Record<WorkflowStatus, string> = {
   pending: "Pending",
   processing: "Processing",
-  waiting_approval: "Awaiting Approval",
+  waiting_compliance: "Awaiting compliance",
+  waiting_approval: "Awaiting advisor approval",
   completed: "Completed",
   failed: "Failed",
   rejected: "Rejected",
@@ -156,7 +155,11 @@ export function WorkflowTimeline({ workflowId, poll = true }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  async function load() {
+  useEffect(() => {
+    setLoading(true);
+  }, [workflowId]);
+
+  const load = useCallback(async () => {
     try {
       const data = await fetchWorkflow(workflowId);
       setWorkflow(data);
@@ -166,20 +169,24 @@ export function WorkflowTimeline({ workflowId, poll = true }: Props) {
     } finally {
       setLoading(false);
     }
-  }
-
-  useEffect(() => {
-    void load();
   }, [workflowId]);
 
   useEffect(() => {
-    if (!poll || !workflow) return;
-    const terminal = ["completed", "failed", "rejected"];
-    if (terminal.includes(workflow.status)) return;
+    void load();
+  }, [load]);
+
+  useEffect(() => {
+    if (!poll || !workflow) {
+      return;
+    }
+    const terminal: WorkflowStatus[] = ["completed", "failed", "rejected"];
+    if (terminal.includes(workflow.status)) {
+      return;
+    }
 
     const id = setInterval(() => void load(), 3000);
     return () => clearInterval(id);
-  }, [poll, workflow]);
+  }, [poll, workflow, load]);
 
   if (loading) {
     return <p className="text-sm text-slate-500">Loading workflow…</p>;
@@ -189,15 +196,31 @@ export function WorkflowTimeline({ workflowId, poll = true }: Props) {
     return <p className="text-sm text-rose-400">{error ?? "Workflow not found."}</p>;
   }
 
-  const nodeStates = resolveNodeStates(workflow.status);
+  const resultJson = workflow.result_json && typeof workflow.result_json === "object" ? (workflow.result_json as Record<string, unknown>) : null;
+  const nodeStates = resolveNodeStates(workflow.status, resultJson);
+  const complianceRejected = workflow.status === "rejected" && Boolean(resultJson?.compliance_rejected);
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <span className="text-xs font-medium text-slate-500">Workflow #{workflow.id}</span>
         <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_BADGE[workflow.status]}`}>{STATUS_LABEL[workflow.status]}</span>
         {workflow.celery_state ? <span className="text-xs text-slate-600">({workflow.celery_state})</span> : null}
       </div>
+
+      {workflow.status === "waiting_compliance" ? (
+        <div className="rounded-lg border border-violet-500/35 bg-violet-950/35 px-4 py-3 text-sm leading-relaxed text-violet-100">
+          <p className="font-medium text-violet-200">Compliance review required</p>
+          <p className="mt-1 text-violet-100/90">This draft scored high risk. A user with the compliance role must clear or reject it from the Compliance reviews page before you can approve it here.</p>
+        </div>
+      ) : null}
+
+      {complianceRejected ? (
+        <div className="rounded-lg border border-rose-500/40 bg-rose-950/30 px-4 py-3 text-sm leading-relaxed text-rose-100">
+          <p className="font-medium text-rose-200">Closed at compliance</p>
+          <p className="mt-1 text-rose-100/90">Compliance rejected this workflow. Review notes on the meeting page if provided, revise source notes or drafts, and start a new summary run when ready.</p>
+        </div>
+      ) : null}
 
       <div className="flex flex-wrap items-center gap-1">
         {NODES.map((node, idx) => {

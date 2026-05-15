@@ -1,333 +1,202 @@
 # Advisor Flow AI
 
-AI-native workflow platform for financial advisors and wealth management operations.
+**AI-native workflow platform for financial advisors and wealth management operations.**
 
-Advisor Flow AI is a production-oriented AI workflow system designed to assist financial advisors with document processing, meeting preparation, compliance review, operational workflows, and AI-assisted task execution.
+_（中文：面向理財顧問與財富管理營運的 AI 原生工作流程平台。）_
 
-The platform focuses on bridging AI systems with real operational workflows through structured orchestration, approval pipelines, auditability, and human-in-the-loop interaction patterns.
+Advisor Flow AI is a production-oriented system for document processing, meeting prep, compliance review, operational workflows, and AI-assisted task execution. It connects AI to real operations through orchestration, approval pipelines, auditability, and human-in-the-loop patterns.
 
----
-
-# Core Vision
-
-Modern financial advisory workflows involve a large amount of operational overhead:
-
-- Meeting preparation
-- CRM updates
-- Compliance checks
-- Client onboarding
-- Document summarization
-- Follow-up generation
-- Action item tracking
-
-Advisor Flow AI transforms these workflows into AI-assisted operational pipelines with human review, traceability, and structured execution.
-
-The system is intentionally designed as:
-
-- AI operational system
-- workflow orchestration platform
-- AI-native productivity workspace
-- compliance-aware enterprise AI application
-
-rather than a simple chatbot wrapper.
+_（本專案以「可上線營運」為目標，把 AI 接到實際流程：編排、簽核、稽核與人在回路。）_
 
 ---
 
-# Key Features
+## Core vision
 
-## AI Workflow Orchestration
+Modern advisory work involves heavy operational overhead: meeting prep, CRM updates, compliance, onboarding, summarization, follow-ups, and action tracking.
 
-- Multi-step AI workflows using LangGraph
-- Stateful workflow execution
-- Human-in-the-loop approval flow
-- Retry / fallback execution handling
-- Structured AI outputs with validation
+_（現代顧問工作負載很高：會議準備、CRM、法遵、開戶、摘要、後續追蹤與待辦。）_
 
-Example workflow:
+Advisor Flow AI turns these into **pipelines** with human review, traceability, and structured execution—not a thin chat wrapper.
 
-1. Upload client meeting transcript
-2. AI summarizes meeting
-3. Extract action items
-4. Generate CRM update draft
-5. Compliance review agent validation
-6. Human approval
-7. Final workflow execution
+Intended shape:
 
----
-
-## AI Copilot Workspace
-
-Interactive AI workspace for advisors:
-
-- Context-aware AI chat
-- Streaming responses
-- Tool execution timeline
-- Source citations
-- AI memory context
-- Workflow status visualization
+```
+| Role                   | Meaning                   |
+| ----                   | -------                   |
+| AI operational system  | AI 驅動的營運系統          |
+| Workflow orchestration | 工作流程編排平台           |
+| Productivity workspace | AI 原生協作工作台          |
+| Enterprise AI          | 具法遵意識的企業級 AI 應用  |
+```
 
 ---
 
-## Document Intelligence
+## Key features
 
-- PDF ingestion
-- OCR extraction
-- Semantic chunking
-- Vector embeddings
-- Retrieval-Augmented Generation (RAG)
-- AI document summarization
-- Risk / compliance analysis
+### AI workflow orchestration
 
----
+_（AI 工作流程編排）_
 
-## Compliance & Approval System
+- Multi-step flows with **LangGraph**, stateful execution, human-in-the-loop approvals, retries/fallbacks, validated structured outputs.
 
-Enterprise-grade operational controls:
+**Example:** upload transcript → summarize → extract actions → CRM draft → compliance validation → human approval → finalize.
 
-- Approval workflows
-- Audit logs
-- Workflow traceability
-- Permission-based access control
-- AI action review
-- Sensitive operation gating
+### AI copilot workspace
 
----
+_（顧問用 AI 工作區）_
 
-## AI Agent System
+- Context-aware chat, streaming, tool timeline, citations, memory context, workflow status.
 
-AI agents can:
+### Document intelligence
 
-- Generate meeting summaries
-- Draft client follow-up emails
-- Analyze financial risk statements
-- Detect missing compliance fields
-- Extract structured client data
-- Suggest operational next steps
+_（文件智慧：解析、向量、RAG）_
+
+- PDF ingestion, OCR, semantic chunking, embeddings, RAG, summarization, risk/compliance-oriented analysis.
+
+### Compliance & approvals
+
+_（合規與簽核）_
+
+- Approval flows, audit logs, traceability, permission-based access, AI action review, gating for sensitive steps.
+
+### AI agents
+
+_（代理能力概要）_
+
+- Meeting summaries, follow-up drafts, risk-text analysis, missing compliance signals, structured extraction, suggested next steps.
 
 ---
 
-# Tech Stack
+## Tech stack
 
----
-
-# Monorepo
+### Monorepo
 
 | Technology | Purpose                      |
 | ---------- | ---------------------------- |
 | TurboRepo  | Monorepo orchestration       |
 | Yarn       | Workspace package management |
 
----
+### Frontend
 
-# Frontend
+| Technology                | Purpose               |
+| ------------------------- | --------------------- |
+| React / TypeScript / Vite | App & build           |
+| Zustand / TanStack Query  | Client & server state |
+| Tailwind CSS / shadcn/ui  | Styling & components  |
+| React Hook Form / Zod     | Forms & validation    |
+| Framer Motion / PDF.js    | Motion & PDF          |
+| EventSource / SSE         | Streaming AI          |
 
-| Technology        | Purpose                        |
-| ----------------- | ------------------------------ |
-| React             | Frontend framework             |
-| TypeScript        | Type-safe frontend development |
-| Vite              | Frontend build tooling         |
-| Zustand           | Lightweight state management   |
-| TanStack Query    | Server state management        |
-| Tailwind CSS      | Styling system                 |
-| shadcn/ui         | UI component system            |
-| React Hook Form   | Form management                |
-| Zod               | Frontend schema validation     |
-| Framer Motion     | Animation system               |
-| PDF.js            | PDF rendering                  |
-| EventSource / SSE | Streaming AI responses         |
+### Backend
 
----
+| Technology                  | Purpose                 |
+| --------------------------- | ----------------------- |
+| Django / DRF                | API                     |
+| Uvicorn                     | ASGI                    |
+| Pydantic                    | Schema validation       |
+| SQLAlchemy / Alembic        | ORM & migrations        |
+| PostgreSQL / Redis / Celery | Data, cache, async jobs |
+| Ruff                        | Lint & format           |
 
-# Backend
+### AI / LLM
 
-| Technology            | Purpose                       |
-| --------------------- | ----------------------------- |
-| Django                | Backend framework             |
-| Django REST Framework | REST API layer                |
-| Uvicorn               | ASGI server                   |
-| Pydantic              | Structured schema validation  |
-| SQLAlchemy            | ORM layer for service modules |
-| Alembic               | Database migration management |
-| PostgreSQL            | Primary relational database   |
-| Redis                 | Queue + caching               |
-| Celery                | Async task processing         |
-| Ruff                  | Linter & Formatter            |
+| Technology                  | Purpose                     |
+| --------------------------- | --------------------------- |
+| LangChain / LangGraph       | LLM & stateful workflows    |
+| LangSmith                   | Tracing                     |
+| OpenAI / Gemini / Anthropic | Model providers             |
+| pgvector                    | Vector search               |
+| Instructor / tiktoken       | Structured outputs & tokens |
+| RAG pipeline                | Retrieval                   |
 
----
+### DevOps
 
-# AI / LLM Stack
-
-| Technology    | Purpose                         |
-| ------------- | ------------------------------- |
-| LangChain     | LLM abstraction layer           |
-| LangGraph     | Stateful workflow orchestration |
-| LangSmith     | AI tracing & observability      |
-| OpenAI API    | LLM provider                    |
-| Gemini API    | LLM provider                    |
-| Anthropic API | LLM provider                    |
-| pgvector      | Vector similarity search        |
-| Instructor    | Structured output enforcement   |
-| tiktoken      | Token estimation                |
-| RAG Pipeline  | Retrieval workflows             |
+| Technology              | Purpose                  |
+| ----------------------- | ------------------------ |
+| Docker / Docker Compose | Containers & local stack |
 
 ---
 
-# DevOps / Infra
+## Core concepts
 
-| Technology     | Purpose             |
-| -------------- | ------------------- |
-| Docker         | Containerization    |
-| Docker Compose | Local orchestration |
+### 1. Human-in-the-loop
 
----
+_（敏感操作不自動放行；需核准、可查、可回溯。）_
 
-# Core System Concepts
+AI does **not** directly execute sensitive operations. Critical paths require approval, review, audit trails, and rollback where applicable.
 
----
+### 2. Workflow-first
 
-# 1. Human-in-the-loop AI
+_（以流程為中心，而非單一提示詞。）_
 
-AI does NOT directly execute sensitive operations.
+Workflows encode state transitions, tools, retries, approval states, and audit records.
 
-Critical workflows require:
+### 3. Structured outputs
 
-- approval
-- review
-- audit traceability
-- rollback capability
+_（輸出要可驗證：Pydantic、JSON、解析與降級策略。）_
 
-This mirrors real enterprise AI operational constraints.
+Pydantic schemas, structured JSON, deterministic parsing, fallback validation—for reliability in enterprise settings.
 
----
+### 4. Observability
 
-# 2. Workflow-first Architecture
+_（可觀測：token、trace、log、prompt 版本與失敗分析。）_
 
-The platform is designed around workflows instead of isolated prompts.
-
-Each workflow contains:
-
-- state transitions
-- tool execution
-- retry handling
-- approval states
-- audit records
+Token usage, execution traces, workflow logs, prompt versioning, failure analysis—via LangSmith and internal pipelines.
 
 ---
 
-# 3. Structured AI Outputs
+## Example workflows
 
-AI outputs are validated using:
+**Meeting summary** — Upload transcript → chunk/embed → structured summary → client concerns → follow-ups → CRM draft → approval → audit log.
 
-- Pydantic schemas
-- structured JSON outputs
-- deterministic parsing
-- fallback validation
+**Compliance review** — Analyze advisor content → prohibited phrases → disclosures → risk score → review task if needed.
 
-This improves reliability for enterprise environments.
+**Email draft** — Client context → recent meetings → draft → compliance check → approval → send via integration.
 
 ---
 
-# 4. AI Observability
+## Architecture goals
 
-All AI executions include:
+_（架構目標：可稽核、可靠編排、模組化管線、異步擴展、清楚的 AI UX、可多供應商切換。）_
 
-- token usage tracking
-- execution traces
-- workflow logs
-- prompt versioning
-- failure analysis
-
-using LangSmith + internal observability pipelines.
+AI-native ops, enterprise auditability, reliable orchestration, modular AI/async scale, clear UX, provider-agnostic integration.
 
 ---
 
-# Example Workflows
+## Roadmap (ideas)
+
+Multi-agent collaboration, tool sandboxes, MCP, voice ingestion, real-time collaboration, autonomous policy layers, eval pipelines, durable agent memory.
+
+_（規劃方向：多代理、工具沙箱、MCP、語音會議、即時協作、自治策略、評測、記憶持久化等。）_
 
 ---
 
-# Meeting Summary Workflow
+## Local development
 
-1. Upload meeting transcript
-2. Chunk & embed transcript
-3. Generate structured summary
-4. Extract client concerns
-5. Generate follow-up tasks
-6. Draft CRM update
-7. Human approval
-8. Persist audit log
-
----
-
-# Compliance Review Workflow
-
-1. Analyze generated advisor response
-2. Detect prohibited statements
-3. Validate required disclosures
-4. Assign risk score
-5. Trigger review task if necessary
-
----
-
-# AI Email Draft Workflow
-
-1. Load client context
-2. Retrieve recent meetings
-3. Generate personalized draft
-4. Compliance validation
-5. Human approval
-6. Send via integration service
-
----
-
-# Architecture Goals
-
-- AI-native operational workflow system
-- Enterprise-grade auditability
-- Reliable orchestration
-- Modular AI pipelines
-- Async workflow scalability
-- Clear AI UX patterns
-- Provider-agnostic AI integration
-
----
-
-# Future Enhancements
-
-- Multi-agent collaboration
-- Tool permission sandboxing
-- MCP integration
-- Voice meeting ingestion
-- Real-time collaborative workflows
-- Autonomous workflow execution policies
-- AI evaluation pipelines
-- Agent memory persistence
-
----
-
-# Local Development
-
-## Frontend
+### Frontend
 
 ```bash
 yarn install
 yarn dev
 ```
 
-## Backend
+### Backend
 
 ```bash
 uv sync
 uvicorn app.main:app --reload
 ```
 
-## Workers
+### Workers
 
 ```bash
 celery -A app.worker worker --loglevel=info
 ```
 
+_（中文：前端用 Yarn；後端用 `uv` 安裝依賴並啟動 ASGI；非同步任務另起 Celery worker。）_
+
 ---
 
-# License
+## License
 
 MIT

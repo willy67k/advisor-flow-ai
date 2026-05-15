@@ -29,4 +29,7 @@ export interface MeetingAiSummary {
   readonly summary: string | null;
   readonly action_items: readonly MeetingAiSummaryActionItem[];
   readonly approval_decision_note: string | null;
+  /** Present when GET /ai-summary/ includes compliance outcome (backend Step 7.1+). */
+  readonly compliance_rejected?: boolean;
+  readonly compliance_decision_note?: string | null;
 }

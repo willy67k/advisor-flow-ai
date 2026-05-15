@@ -5,9 +5,9 @@ from __future__ import annotations
 from django.conf import settings
 from django.db.models import QuerySet
 
-from app.models.approval import ApprovalRequest
 from app.models.meeting import Meeting
 from app.models.workflow import Workflow
+from app.services.workflows.checkpoint_bridge import sync_workflow_from_graph_state
 from app.services.workflows.meeting_summary import (
     graph_first_interrupt_value,
     invoke_meeting_summary_graph,
@@ -54,20 +54,16 @@ def run_meeting_summary_task(
         intr = graph_first_interrupt_value(state)
 
         if intr is not None:
-            ar = ApprovalRequest.objects.create(
-                workflow=wf_row,
-                status=ApprovalRequest.Status.PENDING,
-                reviewer=None,
-                ai_draft_json=(
-                    intr
-                    if isinstance(intr, dict)
-                    else {"summary": "", "action_items": [], "raw": intr}
-                ),
-            )
-            wf_qs.update(status=Workflow.Status.WAITING_APPROVAL, result_json=None)
+            sync = sync_workflow_from_graph_state(wf_row, state)
+            if sync.get("awaiting_compliance"):
+                return {"awaiting_compliance": True}
+            apid = sync.get("approval_request_id")
+            if apid is None:
+                msg = "interrupt present but workflow sync returned no approval id"
+                raise RuntimeError(msg)
             return {
                 "awaiting_approval": True,
-                "approval_request_id": int(ar.pk),
+                "approval_request_id": int(apid),
             }
 
         structured = meeting_state_to_summary_output(state)

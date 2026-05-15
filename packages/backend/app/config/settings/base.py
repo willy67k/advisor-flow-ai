@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     "app.documents",
     "app.workflows",
     "app.approvals.apps.ApprovalsConfig",
+    "app.compliance.apps.ComplianceConfig",
 ]
 
 MIDDLEWARE = [

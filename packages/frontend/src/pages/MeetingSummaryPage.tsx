@@ -10,18 +10,20 @@ import type { WorkflowStatus } from "../types/workflows";
 
 type TabKey = "run" | "approvals";
 
-const WF_STATUS_ROW: Partial = {
+const WF_STATUS_ROW: Record<WorkflowStatus, string> = {
   pending: "bg-slate-700 text-slate-300",
   processing: "bg-amber-500/20 text-amber-400",
+  waiting_compliance: "bg-violet-500/20 text-violet-300",
   waiting_approval: "bg-blue-500/20 text-blue-300",
   completed: "bg-emerald-500/20 text-emerald-400",
   failed: "bg-rose-500/20 text-rose-400",
   rejected: "bg-rose-500/20 text-rose-300",
 };
 
-const WF_STATUS_LABEL: Partial = {
+const WF_STATUS_LABEL: Record<WorkflowStatus, string> = {
   pending: "Pending",
   processing: "Processing",
+  waiting_compliance: "Awaiting compliance",
   waiting_approval: "Awaiting approval",
   completed: "Completed",
   failed: "Failed",
@@ -75,7 +77,8 @@ export function MeetingSummaryPage() {
       <div>
         <h1 className="text-xl font-semibold tracking-tight text-white">Meeting summary</h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-400">
-          Run AI meeting summaries, track workflow progress, and approve or reject drafts before they are saved. After approval, open the meeting from Meetings to view the finalized read-only summary.
+          Run AI meeting summaries, track workflow progress, and approve or reject drafts before they are saved. High-risk drafts pause for <strong className="font-medium text-slate-300">compliance review</strong> before they reach your
+          approval queue. After approval, open the meeting from Meetings to view the finalized read-only summary.
         </p>
       </div>
 
@@ -212,7 +215,9 @@ export function MeetingSummaryPage() {
           <div className="flex items-center justify-between gap-4">
             <div>
               <h2 className="text-sm font-semibold text-slate-200">Pending drafts</h2>
-              <p className="text-xs text-slate-500">Summaries awaiting your decision appear here.</p>
+              <p className="text-xs text-slate-500">
+                Summaries awaiting your decision appear here. If a run shows <span className="text-violet-300">Awaiting compliance</span> in the table above, a compliance officer must clear it first.
+              </p>
             </div>
             <button type="button" className="text-xs font-medium text-emerald-400 hover:text-emerald-300 disabled:opacity-50" disabled={pending.isFetching} onClick={() => void pending.refetch()}>
               {pending.isFetching ? "Refreshing…" : "Refresh"}

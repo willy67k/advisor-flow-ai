@@ -20,6 +20,7 @@ from app.config.env import get_env
 from app.prompts import PromptKey, prompt_template
 from app.services.ai.gateway import ChatMessage, LLMProvider, complete_chat
 from app.services.ai.retrieval import retrieve_context_for_meeting_notes
+from app.services.compliance.reviewer import review_meeting_summary_draft
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,19 @@ _APPROVAL_ACTION_REJECT = "reject"
 
 _APPROVAL_RESULT_APPROVED = "approved"
 _APPROVAL_RESULT_REJECTED = "rejected"
+
+_COMPLIANCE_ACTION_CLEAR = "clear"
+_COMPLIANCE_ACTION_REJECT = "reject"
+
+_COMPLIANCE_ROUTER_HOLD = "compliance_hold"
+_COMPLIANCE_ROUTER_ADVISOR = "advisor_gate"
+_COMPLIANCE_ROUTER_END = "stop"
+
+_HIGH_RISK = "high"
+
+_NOTES_PLACEHOLDER_FOR_RAG_ONLY = (
+    "(No typed meeting notes in the app — summarize substantively from the document excerpts.)"
+)
 
 
 class MeetingActionItem(BaseModel):
@@ -63,6 +77,10 @@ class MeetingWorkflowState(TypedDict, total=False):
     rag_context: str
     summary: str
     action_items: list[dict[str, Any]]
+    compliance_risk: str
+    compliance_report: dict[str, Any]
+    compliance_decision: str
+    compliance_decision_note: str
     approval_status: str
     approval_decision_note: str
 
@@ -82,17 +100,35 @@ def graph_first_interrupt_value(result: Mapping[str, Any]) -> Any | None:
 
 
 def build_meeting_summary_graph(checkpointer: Any) -> CompiledStateGraph:
-    """Compiled graph with RAG retrieval, then summary, approvals interrupt, checkpointer."""
+    """Compiled graph: RAG → summary → compliance → optional compliance hold → advisor approval."""
     workflow = StateGraph(MeetingWorkflowState)
     workflow.add_node("retrieve_context", _node_retrieve_context)
     workflow.add_node("generate_summary", _node_generate_summary)
     workflow.add_node("extract_action_items", _node_extract_action_items)
-    workflow.add_node("wait_for_approval", _node_wait_for_approval)
+    workflow.add_node("compliance_check", _node_compliance_check)
+    workflow.add_node("wait_for_compliance", _node_wait_for_compliance)
+    workflow.add_node("wait_for_advisor_approval", _node_wait_for_advisor_approval)
     workflow.add_edge(START, "retrieve_context")
     workflow.add_edge("retrieve_context", "generate_summary")
     workflow.add_edge("generate_summary", "extract_action_items")
-    workflow.add_edge("extract_action_items", "wait_for_approval")
-    workflow.add_edge("wait_for_approval", END)
+    workflow.add_edge("extract_action_items", "compliance_check")
+    workflow.add_conditional_edges(
+        "compliance_check",
+        _route_after_compliance_check,
+        {
+            _COMPLIANCE_ROUTER_HOLD: "wait_for_compliance",
+            _COMPLIANCE_ROUTER_ADVISOR: "wait_for_advisor_approval",
+        },
+    )
+    workflow.add_conditional_edges(
+        "wait_for_compliance",
+        _route_after_compliance_resume,
+        {
+            _COMPLIANCE_ROUTER_ADVISOR: "wait_for_advisor_approval",
+            _COMPLIANCE_ROUTER_END: END,
+        },
+    )
+    workflow.add_edge("wait_for_advisor_approval", END)
     return workflow.compile(checkpointer=checkpointer)
 
 
@@ -160,11 +196,15 @@ def run_meeting_summary_workflow(
         {"notes": notes, **({"meeting_id": int(meeting_id)} if meeting_id is not None else {})},
     )
     out = compiled.invoke(initial, cfg)
-    if graph_first_interrupt_value(out) is not None:
-        payload = approval_resume or {
-            "action": _APPROVAL_ACTION_APPROVE,
-            "note": "",
-        }
+    while graph_first_interrupt_value(out) is not None:
+        intr = graph_first_interrupt_value(out)
+        if isinstance(intr, dict) and intr.get("stage") == "compliance_review":
+            payload = {"action": _COMPLIANCE_ACTION_CLEAR, "note": ""}
+        else:
+            payload = approval_resume or {
+                "action": _APPROVAL_ACTION_APPROVE,
+                "note": "",
+            }
         out = compiled.invoke(Command(resume=payload), cfg)
     if graph_first_interrupt_value(out) is not None:
         msg = "meeting summary graph is still interrupted after resume"
@@ -244,7 +284,7 @@ def _llm_extract_action_items(*, notes: str, summary: str) -> list[MeetingAction
 def _node_retrieve_context(state: MeetingWorkflowState) -> MeetingWorkflowState:
     mid = state.get("meeting_id")
     notes = str(state.get("notes") or "")
-    if mid is None or not notes.strip():
+    if mid is None:
         return {"rag_context": ""}
     rag = retrieve_context_for_meeting_notes(meeting_id=int(mid), query_text=notes)
     return {"rag_context": rag}
@@ -252,33 +292,95 @@ def _node_retrieve_context(state: MeetingWorkflowState) -> MeetingWorkflowState:
 
 def _node_generate_summary(state: MeetingWorkflowState) -> MeetingWorkflowState:
     notes = state.get("notes", "").strip()
-    if not notes:
-        logger.warning("meeting_summary: empty notes; skipping LLM summarize.")
+    rag = str(state.get("rag_context") or "").strip()
+    if not notes and not rag:
+        logger.warning(
+            "meeting_summary: empty notes and no document context; skipping LLM summarize."
+        )
         return {"summary": ""}
-    rag = str(state.get("rag_context") or "")
-    summary = _llm_summarize_notes(notes=notes, rag_context=rag)
+    effective_notes = notes if notes else _NOTES_PLACEHOLDER_FOR_RAG_ONLY
+    summary = _llm_summarize_notes(notes=effective_notes, rag_context=rag)
     return {"summary": summary}
 
 
 def _node_extract_action_items(state: MeetingWorkflowState) -> MeetingWorkflowState:
-    notes_raw = state.get("notes", "")
+    notes_raw = str(state.get("notes") or "").strip()
     summary = state.get("summary", "")
     if not summary.strip():
         return {"action_items": []}
 
     rag = str(state.get("rag_context") or "").strip()
+    notes_for_extract = notes_raw or _NOTES_PLACEHOLDER_FOR_RAG_ONLY
     notes = (
-        notes_raw + "\n\n[Retrieved excerpts from uploaded documents]\n" + rag if rag else notes_raw
+        notes_for_extract + "\n\n[Retrieved excerpts from uploaded documents]\n" + rag
+        if rag
+        else notes_for_extract
     )
 
     raw_items = _llm_extract_action_items(notes=notes, summary=summary)
     return {"action_items": [item.model_dump() for item in raw_items]}
 
 
-def _node_wait_for_approval(state: MeetingWorkflowState) -> MeetingWorkflowState:
-    draft = {
+def _node_compliance_check(state: MeetingWorkflowState) -> MeetingWorkflowState:
+    summary = str(state.get("summary") or "")
+    items = state.get("action_items") or []
+    if not summary.strip() and not items:
+        report = review_meeting_summary_draft(summary="", action_items=[]).to_dict()
+        return {
+            "compliance_risk": report["risk_level"],
+            "compliance_report": report,
+        }
+    raw_items: list[dict[str, Any]] = items if isinstance(items, list) else []
+    result = review_meeting_summary_draft(summary=summary, action_items=raw_items)
+    report = result.to_dict()
+    return {
+        "compliance_risk": result.risk_level.value,
+        "compliance_report": report,
+    }
+
+
+def _route_after_compliance_check(state: MeetingWorkflowState) -> str:
+    risk = str(state.get("compliance_risk") or "")
+    return _COMPLIANCE_ROUTER_HOLD if risk == _HIGH_RISK else _COMPLIANCE_ROUTER_ADVISOR
+
+
+def _node_wait_for_compliance(state: MeetingWorkflowState) -> MeetingWorkflowState:
+    payload = {
+        "stage": "compliance_review",
         "summary": state.get("summary", ""),
         "action_items": state.get("action_items") or [],
+        "compliance": state.get("compliance_report") or {},
+    }
+    decision = interrupt(payload)
+    if not isinstance(decision, dict):
+        msg = "compliance resume payload must be a JSON object."
+        raise TypeError(msg)
+
+    action = str(decision.get("action") or "").strip().lower()
+    note = str(decision.get("note") or "").strip()
+    if action == _COMPLIANCE_ACTION_REJECT:
+        return {"compliance_decision": "rejected", "compliance_decision_note": note}
+    if action != _COMPLIANCE_ACTION_CLEAR:
+        unknown = decision.get("action")
+        raise ValueError(f"unknown compliance action: {unknown!r}")
+
+    return {"compliance_decision": "cleared", "compliance_decision_note": note}
+
+
+def _route_after_compliance_resume(state: MeetingWorkflowState) -> str:
+    return (
+        _COMPLIANCE_ROUTER_END
+        if str(state.get("compliance_decision") or "") == "rejected"
+        else _COMPLIANCE_ROUTER_ADVISOR
+    )
+
+
+def _node_wait_for_advisor_approval(state: MeetingWorkflowState) -> MeetingWorkflowState:
+    draft = {
+        "stage": "advisor_approval",
+        "summary": state.get("summary", ""),
+        "action_items": state.get("action_items") or [],
+        "compliance": state.get("compliance_report") or {},
     }
     decision = interrupt(draft)
     if not isinstance(decision, dict):

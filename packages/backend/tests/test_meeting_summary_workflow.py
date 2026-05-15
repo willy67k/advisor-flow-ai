@@ -86,6 +86,61 @@ def test_meeting_summary_graph_invokes_ordered_nodes():
 
 
 @pytest.mark.django_db
+def test_high_risk_summary_interrupts_compliance_before_advisor():
+    patched_items = [MeetingActionItem(task="Rewrite client letter", owner="Advisor", due=None)]
+
+    with (
+        patch(
+            "app.services.workflows.meeting_summary._llm_summarize_notes",
+            return_value="We position the sleeve as risk-free for conservative clients.",
+        ),
+        patch(
+            "app.services.workflows.meeting_summary._llm_extract_action_items",
+            return_value=patched_items,
+        ),
+    ):
+        mem = MemorySaver()
+        graph = build_meeting_summary_graph(mem)
+        cfg = {"configurable": {"thread_id": "compliance-first"}}
+        halted = graph.invoke({"notes": SAMPLE_NOTES}, cfg)
+
+    intr = graph_first_interrupt_value(halted)
+    assert isinstance(intr, dict)
+    assert intr.get("stage") == "compliance_review"
+    assert intr.get("compliance", {}).get("risk_level") == "high"
+
+
+@pytest.mark.django_db
+def test_empty_notes_still_summarizes_when_rag_context_resolved():
+    def capture_summarize(*, notes: str, rag_context: str = "") -> str:
+        assert "document excerpts" in notes.lower() or "No typed meeting notes" in notes
+        assert "PDF body" in rag_context
+        return "Summary-from-upload"
+
+    with (
+        patch(
+            "app.services.workflows.meeting_summary.retrieve_context_for_meeting_notes",
+            return_value="PDF body text",
+        ),
+        patch(
+            "app.services.workflows.meeting_summary._llm_summarize_notes",
+            side_effect=capture_summarize,
+        ),
+        patch(
+            "app.services.workflows.meeting_summary._llm_extract_action_items",
+            return_value=[MeetingActionItem(task="Email client")],
+        ),
+    ):
+        mem = MemorySaver()
+        graph = build_meeting_summary_graph(mem)
+        cfg = {"configurable": {"thread_id": "notes-empty-rag"}}
+        halted = graph.invoke({"notes": "", "meeting_id": 1}, cfg)
+
+    assert graph_first_interrupt_value(halted) is not None
+    assert halted.get("summary") == "Summary-from-upload"
+
+
+@pytest.mark.django_db
 def test_empty_notes_skips_downstream_extract_llm():
     captured: dict[str, bool] = {"extract_called": False}
 

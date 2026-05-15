@@ -21,7 +21,7 @@ export function useCreateMeeting() {
 export function useUpdateMeeting() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, body }: { id: number; body: Partial }) => updateMeeting(id, body),
+    mutationFn: ({ id, body }: { id: number; body: Partial<MeetingInput> }) => updateMeeting(id, body),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["meetings"] }),
   });
 }

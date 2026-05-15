@@ -23,7 +23,7 @@ const schema = z
     }
   });
 
-type FormValues = z.infer;
+type FormValues = z.infer<typeof schema>;
 
 export function RegisterPage() {
   const navigate = useNavigate();
